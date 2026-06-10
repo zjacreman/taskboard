@@ -432,14 +432,14 @@ fn draw_view_manager(frame: &mut ratatui::Frame, app: &App) {
             Line::from(format!("Editing view: {}", app.views.get(app.view_manager_state.selected().unwrap_or(0)).map(|v| v.name.as_str()).unwrap_or(""))),
             Line::from(""),
             Line::from(vec![
-                Span::styled(format!("{}: ", field_name), Style::default().fg(Color::DarkGray)),
+                Span::styled(format!("{}: ", field_name), Style::default().fg(Color::Gray)),
                 Span::raw(&app.editing_view_text),
                 Span::styled("█", Style::default().fg(Color::White)),
             ]),
             Line::from(""),
             Line::from(Span::styled(
                 "Tab: next field | Enter: save | Esc: cancel",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(Color::Gray),
             )),
         ];
 
@@ -473,7 +473,7 @@ fn draw_view_manager(frame: &mut ratatui::Frame, app: &App) {
 
         let help_line = Line::from(Span::styled(
             "Enter: switch | e: edit | d: del | Esc: close",
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(Color::Gray),
         ));
 
         let help_item = ListItem::new(help_line);

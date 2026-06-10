@@ -230,7 +230,7 @@ pub fn draw(frame: &mut ratatui::Frame, app: &App) {
         .unwrap_or(&task.source_file);
     lines.push(Line::from(Span::styled(
         format!("{}:{}", rel.display(), task.line_number),
-        Style::default().fg(Color::DarkGray),
+        Style::default().fg(Color::Gray),
     )));
     lines.push(Line::from(""));
 
@@ -245,28 +245,28 @@ pub fn draw(frame: &mut ratatui::Frame, app: &App) {
     if editing {
         lines.push(Line::from(Span::styled(
             "Enter: save | Esc: cancel",
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(Color::Gray),
         )));
         lines.push(Line::from(Span::styled(
             "Date: today/tomorrow/YYYY-MM-DD/none",
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(Color::Gray),
         )));
         lines.push(Line::from(Span::styled(
             "Status: todo/done | Priority: lowest..highest/none",
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(Color::Gray),
         )));
     } else {
         lines.push(Line::from(Span::styled(
             "Tab/↑↓: navigate | e/Space: edit field | Enter/Esc: close",
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(Color::Gray),
         )));
         lines.push(Line::from(Span::styled(
             "x: toggle status | d/D: due today/tmr | s/S: sched today/tmr",
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(Color::Gray),
         )));
         lines.push(Line::from(Span::styled(
             "b: bump sched | p: cycle priority | r: clear recurrence",
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(Color::Gray),
         )));
     }
 
@@ -283,7 +283,7 @@ pub fn draw(frame: &mut ratatui::Frame, app: &App) {
 }
 
 fn field_line<'a>(label: &str, value: &str, selected: bool, editing: bool, edit_text: &str) -> Line<'a> {
-    let label_style = Style::default().fg(Color::DarkGray);
+    let label_style = Style::default().fg(Color::Gray);
     let marker = if selected { "▸ " } else { "  " };
 
     if selected && editing {
@@ -300,7 +300,7 @@ fn field_line<'a>(label: &str, value: &str, selected: bool, editing: bool, edit_
             Span::styled(format!("{:12}", label), label_style),
             Span::styled("│ ", Style::default().fg(Color::Cyan)),
             Span::styled(value.to_string(), Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
-            Span::styled("  (e to edit)", Style::default().fg(Color::DarkGray)),
+            Span::styled("  (e to edit)", Style::default().fg(Color::Gray)),
         ])
     } else {
         Line::from(vec![

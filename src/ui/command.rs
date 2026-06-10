@@ -230,11 +230,11 @@ pub fn draw(frame: &mut ratatui::Frame, app: &App) {
     let mut lines: Vec<Line> = Vec::new();
     lines.push(Line::from(Span::styled(
         "One filter per line. Example:",
-        Style::default().fg(Color::DarkGray),
+        Style::default().fg(Color::Gray),
     )));
     lines.push(Line::from(Span::styled(
         "  not done\ndue before tomorrow\nsort by priority",
-        Style::default().fg(Color::DarkGray),
+        Style::default().fg(Color::Gray),
     )));
     lines.push(Line::from(""));
 
@@ -298,7 +298,7 @@ fn draw_save_view(frame: &mut ratatui::Frame, app: &App) {
     let content = vec![
         Line::from(Span::styled(
             "Save as view — enter name:",
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(Color::Gray),
         )),
         Line::from(""),
         Line::from(vec![
@@ -308,11 +308,11 @@ fn draw_save_view(frame: &mut ratatui::Frame, app: &App) {
         Line::from(""),
         Line::from(Span::styled(
             format!("Query: {}", query_line_refs(&app.search_query).first().unwrap_or(&"")),
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(Color::Gray),
         )),
         Line::from(Span::styled(
             "Enter: save | Esc: cancel",
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(Color::Gray),
         )),
     ];
 
