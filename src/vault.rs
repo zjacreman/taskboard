@@ -31,7 +31,7 @@ impl FileWatcher {
             match event.kind {
                 EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_) => {
                     for path in event.paths {
-                        if path.extension().map_or(false, |ext| ext == "md" || ext == "markdown") {
+                        if path.extension().is_some_and(|ext| ext == "md" || ext == "markdown") {
                             changed_files.push(path);
                         }
                     }
@@ -72,10 +72,10 @@ fn find_markdown_files_recursive(dir: &Path, files: &mut Vec<PathBuf>) {
                 continue;
             }
             find_markdown_files_recursive(&path, files);
-        } else if path.is_file() {
-            if name_str.ends_with(".md") || name_str.ends_with(".markdown") {
-                files.push(path);
-            }
+        } else if path.is_file()
+            && (name_str.ends_with(".md") || name_str.ends_with(".markdown"))
+        {
+            files.push(path);
         }
     }
 }

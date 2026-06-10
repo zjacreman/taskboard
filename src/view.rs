@@ -1,4 +1,5 @@
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct View {
     pub name: String,
     pub query: String,

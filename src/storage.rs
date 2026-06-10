@@ -39,6 +39,7 @@ pub fn load_views(path: &Path) -> Result<Vec<View>, Box<dyn std::error::Error>> 
     Ok(views)
 }
 
+#[allow(dead_code)]
 pub fn save_views(views: &[View], path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let file = ViewsFile {
         views: views

@@ -2,6 +2,7 @@ use super::{Task, TaskStatus, Priority};
 use chrono::NaiveDate;
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum Filter {
     Done,
     NotDone,
@@ -39,6 +40,7 @@ pub enum SortField {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct Query {
     pub filters: Vec<Filter>,
     pub sort_by: Option<SortField>,

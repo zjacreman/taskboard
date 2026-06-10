@@ -12,6 +12,7 @@ use ratatui::Terminal;
 use std::io;
 use std::time::Duration;
 
+#[allow(dead_code)]
 pub struct App {
     pub tasks: Vec<Task>,
     pub filtered_tasks: Vec<Task>,

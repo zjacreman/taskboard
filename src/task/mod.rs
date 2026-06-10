@@ -61,6 +61,7 @@ impl Priority {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct Task {
     pub description: String,
     pub status: TaskStatus,

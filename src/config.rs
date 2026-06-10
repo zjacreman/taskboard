@@ -2,6 +2,7 @@ use serde::Deserialize;
 use std::path::Path;
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct Config {
     pub workspace: WorkspaceConfig,
     #[serde(default)]
@@ -16,12 +17,14 @@ pub struct WorkspaceConfig {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct DefaultsConfig {
     #[serde(default = "default_view")]
     pub view: String,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct ThemeConfig {
     #[serde(default = "default_colors")]
     pub colors: String,
