@@ -24,9 +24,9 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
             submit_query(app);
         }
         KeyCode::Char('s') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-            let mut textarea = TextArea::new(vec![String::new()]);
-            textarea.set_cursor_line_style(ratatui::style::Style::default());
-            app.save_view_edit = Some(textarea);
+            let mut save_edit = TextArea::new(vec![String::new()]);
+            save_edit.set_cursor_line_style(ratatui::style::Style::default());
+            app.save_view_edit = Some(save_edit);
         }
         _ => {
             textarea.input(key);
