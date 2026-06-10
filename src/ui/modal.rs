@@ -116,13 +116,21 @@ fn prev_field(f: EditField) -> EditField {
 
 fn start_field_edit(app: &mut App) {
     let Some(idx) = app.selected_task_index() else { return };
+    match app.task_edit_field {
+        EditField::Priority => {
+            app.tasks[idx].priority.cycle();
+            app.dirty = true;
+            return;
+        }
+        _ => {}
+    }
     let text = match app.task_edit_field {
         EditField::Description => app.tasks[idx].description.clone(),
         EditField::Status => match app.tasks[idx].status {
             TaskStatus::Todo => "todo".to_string(),
             TaskStatus::Done => "done".to_string(),
         },
-        EditField::Priority => app.tasks[idx].priority.to_emoji().to_string(),
+        EditField::Priority => unreachable!(),
         EditField::DueDate => app.tasks[idx].due_date
             .map(|d| d.format("%Y-%m-%d").to_string())
             .unwrap_or_default(),
@@ -169,6 +177,7 @@ fn apply_field_edit(app: &mut App) {
         }
         EditField::Priority => {
             app.tasks[idx].priority = match text.to_lowercase().as_str() {
+                "highest" | "🔺" => Priority::Highest,
                 "high" | "⏫" => Priority::High,
                 "medium" | "🔼" => Priority::Medium,
                 "low" | "🔽" => Priority::Low,
@@ -331,6 +340,7 @@ fn status_display(s: TaskStatus) -> &'static str {
 
 fn priority_display(p: Priority) -> &'static str {
     match p {
+        Priority::Highest => "highest",
         Priority::High => "high",
         Priority::Medium => "medium",
         Priority::Low => "low",

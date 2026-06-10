@@ -26,12 +26,14 @@ pub enum Priority {
     Low,
     Medium,
     High,
+    Highest,
 }
 
 impl Priority {
     pub fn cycle(&mut self) {
         *self = match self {
-            Priority::None => Priority::High,
+            Priority::None => Priority::Highest,
+            Priority::Highest => Priority::High,
             Priority::High => Priority::Medium,
             Priority::Medium => Priority::Low,
             Priority::Low => Priority::Lowest,
@@ -41,6 +43,7 @@ impl Priority {
 
     pub fn from_emoji(s: &str) -> Option<Priority> {
         match s {
+            "🔺" => Some(Priority::Highest),
             "⏫" => Some(Priority::High),
             "🔼" => Some(Priority::Medium),
             "🔽" => Some(Priority::Low),
@@ -51,6 +54,7 @@ impl Priority {
 
     pub fn to_emoji(self) -> &'static str {
         match self {
+            Priority::Highest => "🔺",
             Priority::High => "⏫",
             Priority::Medium => "🔼",
             Priority::Low => "🔽",
@@ -93,6 +97,8 @@ mod tests {
     fn test_priority_cycle() {
         let mut priority = Priority::None;
         priority.cycle();
+        assert_eq!(priority, Priority::Highest);
+        priority.cycle();
         assert_eq!(priority, Priority::High);
         priority.cycle();
         assert_eq!(priority, Priority::Medium);
@@ -106,12 +112,14 @@ mod tests {
 
     #[test]
     fn test_priority_emoji_roundtrip() {
+        assert_eq!(Priority::from_emoji("🔺"), Some(Priority::Highest));
         assert_eq!(Priority::from_emoji("⏫"), Some(Priority::High));
         assert_eq!(Priority::from_emoji("🔼"), Some(Priority::Medium));
         assert_eq!(Priority::from_emoji("🔽"), Some(Priority::Low));
         assert_eq!(Priority::from_emoji("⏬"), Some(Priority::Lowest));
         assert_eq!(Priority::from_emoji("x"), None);
 
+        assert_eq!(Priority::Highest.to_emoji(), "🔺");
         assert_eq!(Priority::High.to_emoji(), "⏫");
         assert_eq!(Priority::None.to_emoji(), "");
     }

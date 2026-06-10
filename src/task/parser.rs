@@ -71,7 +71,7 @@ fn parse_line(line: &str, line_number: usize, source_file: &Path) -> Option<Task
                 current_word.clear();
                 scheduled_date = parse_date_from_iter(&mut chars);
             }
-            '⏫' | '🔼' | '🔽' | '⏬' => {
+            '🔺' | '⏫' | '🔼' | '🔽' | '⏬' => {
                 description.push_str(current_word.trim());
                 current_word.clear();
                 priority = Priority::from_emoji(&ch.to_string()).unwrap_or(Priority::None);
@@ -172,7 +172,7 @@ fn parse_tag(chars: &mut std::iter::Peekable<std::str::Chars>) -> String {
 
 fn is_emoji(ch: char) -> bool {
     // Check for common task emojis
-    matches!(ch, '📅' | '🛫' | '🔁' | '✅' | '⏳' | '⏫' | '🔼' | '🔽' | '⏬')
+    matches!(ch, '📅' | '🛫' | '🔁' | '✅' | '⏳' | '🔺' | '⏫' | '🔼' | '🔽' | '⏬')
 }
 
 #[cfg(test)]

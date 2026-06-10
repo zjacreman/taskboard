@@ -666,7 +666,7 @@ mod tests {
 
         assert_eq!(app.tasks[0].priority, Priority::None);
         app.cycle_priority();
-        assert_eq!(app.tasks[0].priority, Priority::High);
+        assert_eq!(app.tasks[0].priority, Priority::Highest);
     }
 
     #[test]
@@ -785,10 +785,10 @@ mod tests {
         assert_eq!(app.tasks[0].status, TaskStatus::Done);
 
         app.cycle_priority();
-        assert_eq!(app.tasks[0].priority, Priority::High);
+        assert_eq!(app.tasks[0].priority, Priority::Highest);
 
         app.update_filtered_tasks();
-        assert_eq!(app.tasks[0].priority, Priority::High);
+        assert_eq!(app.tasks[0].priority, Priority::Highest);
     }
 
     #[test]
@@ -999,18 +999,12 @@ mod tests {
         app.handle_key(key_event(KeyCode::Tab, KeyModifiers::NONE));
         assert_eq!(app.task_edit_field, EditField::Priority);
 
-        // Start editing
+        // Press 'e' to cycle priority (picker, not text editor)
+        assert_eq!(app.tasks[0].priority, Priority::None);
         app.handle_key(key_event(KeyCode::Char('e'), KeyModifiers::NONE));
-        assert_eq!(app.task_edit.as_ref().unwrap().lines()[0], "");
-
-        // Type "high"
-        for c in "high".chars() {
-            app.handle_key(key_event(KeyCode::Char(c), KeyModifiers::NONE));
-        }
-
-        // Save
-        app.handle_key(key_event(KeyCode::Enter, KeyModifiers::NONE));
-        assert_eq!(app.tasks[0].priority, Priority::High);
+        assert_eq!(app.tasks[0].priority, Priority::Highest);
+        // Should not have opened a text editor
+        assert!(app.task_edit.is_none());
     }
 
     #[test]

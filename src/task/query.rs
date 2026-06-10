@@ -327,9 +327,11 @@ fn parse_date(s: &str) -> Result<NaiveDate, String> {
 
 fn parse_priority(s: &str) -> Result<Priority, String> {
     match s {
+        "highest" => Ok(Priority::Highest),
         "high" => Ok(Priority::High),
         "medium" => Ok(Priority::Medium),
         "low" => Ok(Priority::Low),
+        "lowest" => Ok(Priority::Lowest),
         "none" => Ok(Priority::None),
         _ => Err(format!("Unknown priority: {}", s)),
     }
