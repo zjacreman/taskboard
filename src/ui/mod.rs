@@ -161,7 +161,61 @@ impl App {
 
     fn draw(&self, frame: &mut ratatui::Frame) {
         task_list::draw(frame, self);
+
+        if self.show_help {
+            draw_help_overlay(frame);
+        }
     }
+}
+
+fn draw_help_overlay(frame: &mut ratatui::Frame) {
+    use ratatui::layout::Rect;
+    use ratatui::style::{Color, Style};
+    use ratatui::text::Line;
+    use ratatui::widgets::{Block, Borders, Clear, Paragraph};
+
+    let area = frame.area();
+    let popup_width = 50.min(area.width - 4);
+    let popup_height = 20.min(area.height - 4);
+    let x = (area.width - popup_width) / 2;
+    let y = (area.height - popup_height) / 2;
+    let popup_area = Rect::new(x, y, popup_width, popup_height);
+
+    frame.render_widget(Clear, popup_area);
+
+    let help_text = vec![
+        Line::from("Navigation:"),
+        Line::from("  j/k, ↑/↓  Move up/down"),
+        Line::from("  g/G       Jump to top/bottom"),
+        Line::from(""),
+        Line::from("Quick Actions:"),
+        Line::from("  x         Toggle done"),
+        Line::from("  p         Cycle priority"),
+        Line::from("  d/D       Due date: today/tomorrow"),
+        Line::from("  s/S       Scheduled: today/tomorrow"),
+        Line::from("  b         Bump scheduled +1 day"),
+        Line::from(""),
+        Line::from("Views:"),
+        Line::from("  /         Search/query"),
+        Line::from("  v         Switch view"),
+        Line::from("  V         Manage views"),
+        Line::from(""),
+        Line::from("  Enter     Edit task (modal)"),
+        Line::from("  Ctrl+r    Rescan vault"),
+        Line::from("  ?         Toggle help"),
+        Line::from("  q         Quit"),
+    ];
+
+    let paragraph = Paragraph::new(help_text)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("Help")
+                .style(Style::default().bg(Color::DarkGray)),
+        )
+        .style(Style::default().fg(Color::White));
+
+    frame.render_widget(paragraph, popup_area);
 }
 
 #[cfg(test)]
