@@ -54,7 +54,7 @@ fn parse_line(line: &str, line_number: usize, source_file: &Path) -> Option<Task
             '🛫' => {
                 description.push_str(current_word.trim());
                 current_word.clear();
-                scheduled_date = parse_date_from_iter(&mut chars);
+                start_date = parse_date_from_iter(&mut chars);
             }
             '🔁' => {
                 description.push_str(current_word.trim());
@@ -69,7 +69,7 @@ fn parse_line(line: &str, line_number: usize, source_file: &Path) -> Option<Task
             '⏳' => {
                 description.push_str(current_word.trim());
                 current_word.clear();
-                start_date = parse_date_from_iter(&mut chars);
+                scheduled_date = parse_date_from_iter(&mut chars);
             }
             '⏫' | '🔼' | '🔽' | '⏬' => {
                 description.push_str(current_word.trim());

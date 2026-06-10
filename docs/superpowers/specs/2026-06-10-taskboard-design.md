@@ -113,11 +113,11 @@ struct Task {
 
 Emoji mapping (Obsidian Tasks syntax):
 - `📅` — due date
-- `🛫` — scheduled date
+- `⏳` — scheduled date
+- `🛫` — start date (when a task can be started)
 - `🔁` — recurrence (e.g., "every week", "every 2 weeks", "every month on the 1st", "every weekday")
 - `⏫🔼🔽⏬` — priority (high, medium, low, lowest)
 - `✅` — done date
-- `⏳` — start/waiting date (optional, may not be used)
 
 ## Query Engine
 
