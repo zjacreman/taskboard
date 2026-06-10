@@ -1,10 +1,11 @@
 use crate::ui::App;
 use crate::task::{TaskStatus, Priority};
-use crossterm::event::KeyCode;
+use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph};
+use tui_textarea::TextArea;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum EditField {
@@ -16,9 +17,10 @@ pub enum EditField {
     Recurrence,
 }
 
-pub fn handle_key(app: &mut App, code: KeyCode) {
-    if app.editing_task_field {
-        handle_field_edit(app, code);
+pub fn handle_key(app: &mut App, key: KeyEvent) {
+    let code = key.code;
+    if app.task_edit.is_some() {
+        handle_field_edit(app, key);
         return;
     }
 
@@ -114,8 +116,7 @@ fn prev_field(f: EditField) -> EditField {
 
 fn start_field_edit(app: &mut App) {
     let Some(idx) = app.selected_task_index() else { return };
-    app.editing_task_field = true;
-    app.task_edit_text = match app.task_edit_field {
+    let text = match app.task_edit_field {
         EditField::Description => app.tasks[idx].description.clone(),
         EditField::Status => match app.tasks[idx].status {
             TaskStatus::Todo => "todo".to_string(),
@@ -130,43 +131,44 @@ fn start_field_edit(app: &mut App) {
             .unwrap_or_default(),
         EditField::Recurrence => app.tasks[idx].recurrence.clone().unwrap_or_default(),
     };
+    let mut textarea = TextArea::new(vec![text]);
+    textarea.set_cursor_line_style(ratatui::style::Style::default());
+    app.task_edit = Some(textarea);
 }
 
-fn handle_field_edit(app: &mut App, code: KeyCode) {
-    match code {
+fn handle_field_edit(app: &mut App, key: KeyEvent) {
+    match key.code {
         KeyCode::Esc => {
-            app.editing_task_field = false;
-            app.task_edit_text.clear();
+            app.task_edit = None;
         }
         KeyCode::Enter => {
             apply_field_edit(app);
-            app.editing_task_field = false;
-            app.task_edit_text.clear();
+            app.task_edit = None;
         }
-        KeyCode::Backspace => {
-            app.task_edit_text.pop();
+        _ => {
+            if let Some(textarea) = &mut app.task_edit {
+                textarea.input(key);
+            }
         }
-        KeyCode::Char(c) => {
-            app.task_edit_text.push(c);
-        }
-        _ => {}
     }
 }
 
 fn apply_field_edit(app: &mut App) {
+    let Some(textarea) = &app.task_edit else { return };
+    let text = textarea.lines()[0].clone();
     let Some(idx) = app.selected_task_index() else { return };
     match app.task_edit_field {
         EditField::Description => {
-            app.tasks[idx].description = app.task_edit_text.clone();
+            app.tasks[idx].description = text;
         }
         EditField::Status => {
-            app.tasks[idx].status = match app.task_edit_text.to_lowercase().as_str() {
+            app.tasks[idx].status = match text.to_lowercase().as_str() {
                 "done" | "x" | "[x]" => TaskStatus::Done,
                 _ => TaskStatus::Todo,
             };
         }
         EditField::Priority => {
-            app.tasks[idx].priority = match app.task_edit_text.to_lowercase().as_str() {
+            app.tasks[idx].priority = match text.to_lowercase().as_str() {
                 "high" | "⏫" => Priority::High,
                 "medium" | "🔼" => Priority::Medium,
                 "low" | "🔽" => Priority::Low,
@@ -175,16 +177,16 @@ fn apply_field_edit(app: &mut App) {
             };
         }
         EditField::DueDate => {
-            app.tasks[idx].due_date = parse_date_input(&app.task_edit_text);
+            app.tasks[idx].due_date = parse_date_input(&text);
         }
         EditField::ScheduledDate => {
-            app.tasks[idx].scheduled_date = parse_date_input(&app.task_edit_text);
+            app.tasks[idx].scheduled_date = parse_date_input(&text);
         }
         EditField::Recurrence => {
-            if app.task_edit_text.is_empty() {
+            if text.is_empty() {
                 app.tasks[idx].recurrence = None;
             } else {
-                app.tasks[idx].recurrence = Some(app.task_edit_text.clone());
+                app.tasks[idx].recurrence = Some(text);
             }
         }
     }
@@ -209,7 +211,13 @@ pub fn draw(frame: &mut ratatui::Frame, app: &App) {
     let area = frame.area();
     let popup_width = 65.min(area.width - 4);
     // 1 source + 1 empty + 6 fields + 1 empty + 3 or 4 help lines + 2 border
-    let help_lines = if app.editing_task_field { 4 } else { 3 };
+    let editing = app.task_edit.is_some();
+    let (edit_text, cursor_col) = if let Some(textarea) = &app.task_edit {
+        (textarea.lines()[0].as_str(), textarea.cursor().1)
+    } else {
+        ("", 0)
+    };
+    let help_lines = if editing { 4 } else { 3 };
     let popup_height = (10 + help_lines + 2).min(area.height - 4);
     let x = (area.width - popup_width) / 2;
     let y = (area.height - popup_height) / 2;
@@ -221,7 +229,6 @@ pub fn draw(frame: &mut ratatui::Frame, app: &App) {
     let task = &app.tasks[idx];
 
     let selected = app.task_edit_field;
-    let editing = app.editing_task_field;
 
     let mut lines: Vec<Line> = Vec::new();
 
@@ -234,12 +241,12 @@ pub fn draw(frame: &mut ratatui::Frame, app: &App) {
     )));
     lines.push(Line::from(""));
 
-    lines.push(field_line("Description", &task.description, selected == EditField::Description, editing, &app.task_edit_text));
-    lines.push(field_line("Status", status_display(task.status), selected == EditField::Status, editing, &app.task_edit_text));
-    lines.push(field_line("Priority", priority_display(task.priority), selected == EditField::Priority, editing, &app.task_edit_text));
-    lines.push(field_line("Due Date", &date_display(task.due_date), selected == EditField::DueDate, editing, &app.task_edit_text));
-    lines.push(field_line("Scheduled", &date_display(task.scheduled_date), selected == EditField::ScheduledDate, editing, &app.task_edit_text));
-    lines.push(field_line("Recurrence", task.recurrence.as_deref().unwrap_or("none"), selected == EditField::Recurrence, editing, &app.task_edit_text));
+    lines.push(field_line("Description", &task.description, selected == EditField::Description, editing, edit_text, cursor_col));
+    lines.push(field_line("Status", status_display(task.status), selected == EditField::Status, editing, edit_text, cursor_col));
+    lines.push(field_line("Priority", priority_display(task.priority), selected == EditField::Priority, editing, edit_text, cursor_col));
+    lines.push(field_line("Due Date", &date_display(task.due_date), selected == EditField::DueDate, editing, edit_text, cursor_col));
+    lines.push(field_line("Scheduled", &date_display(task.scheduled_date), selected == EditField::ScheduledDate, editing, edit_text, cursor_col));
+    lines.push(field_line("Recurrence", task.recurrence.as_deref().unwrap_or("none"), selected == EditField::Recurrence, editing, edit_text, cursor_col));
 
     lines.push(Line::from(""));
     if editing {
@@ -282,17 +289,20 @@ pub fn draw(frame: &mut ratatui::Frame, app: &App) {
     frame.render_widget(paragraph, popup_area);
 }
 
-fn field_line<'a>(label: &str, value: &str, selected: bool, editing: bool, edit_text: &str) -> Line<'a> {
+fn field_line<'a>(label: &str, value: &str, selected: bool, editing: bool, edit_text: &str, cursor_col: usize) -> Line<'a> {
     let label_style = Style::default().fg(Color::Gray);
     let marker = if selected { "▸ " } else { "  " };
 
     if selected && editing {
+        let before = &edit_text[..cursor_col.min(edit_text.len())];
+        let after = &edit_text[cursor_col.min(edit_text.len())..];
         Line::from(vec![
             Span::raw(marker),
             Span::styled(format!("{:12}", label), label_style),
             Span::styled("│ ", Style::default().fg(Color::Cyan)),
-            Span::raw(edit_text.to_string()),
+            Span::raw(before.to_string()),
             Span::styled("█", Style::default().fg(Color::White)),
+            Span::raw(after.to_string()),
         ])
     } else if selected {
         Line::from(vec![
