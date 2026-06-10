@@ -11,6 +11,9 @@ use ratatui::Terminal;
 use std::io;
 use std::time::Duration;
 
+use ratatui::widgets::ListState;
+use crate::ui::modal::EditField as TaskEditField;
+
 pub struct App {
     pub tasks: Vec<Task>,
     pub filtered_indices: Vec<usize>,
@@ -19,24 +22,30 @@ pub struct App {
     pub current_view: View,
     pub config: Config,
     pub workspace_path: Option<std::path::PathBuf>,
+    pub views_path: std::path::PathBuf,
     pub should_quit: bool,
     pub show_help: bool,
     pub show_modal: bool,
-    pub show_view_switcher: bool,
     pub show_view_manager: bool,
+    pub view_manager_state: ListState,
     pub search_active: bool,
     pub search_query: String,
+    pub search_cursor_row: usize,
+    pub search_cursor_col: usize,
     pub saving_view: bool,
     pub view_name_input: String,
-    pub view_manager_selected: usize,
     pub editing_view: bool,
     pub editing_view_field: ViewEditField,
     pub editing_view_text: String,
+    pub task_edit_field: TaskEditField,
+    pub editing_task_field: bool,
+    pub task_edit_text: String,
     pub file_watcher: Option<crate::vault::FileWatcher>,
     pub dirty: bool,
 }
 
 #[derive(Clone, Copy, PartialEq)]
+#[allow(dead_code)]
 pub enum ViewEditField {
     Name,
     Query,
@@ -48,6 +57,14 @@ impl App {
     pub fn new(config: Config, tasks: Vec<Task>, views: Vec<View>) -> Self {
         let current_view = views.first().cloned().unwrap_or_default();
         let workspace_path = Some(config.workspace.path.clone());
+        let views_path = dirs::config_dir()
+            .unwrap_or_else(|| std::path::PathBuf::from("."))
+            .join("taskboard")
+            .join("views.toml");
+        let mut view_manager_state = ListState::default();
+        if !views.is_empty() {
+            view_manager_state.select(Some(0));
+        }
         Self {
             tasks,
             filtered_indices: Vec::new(),
@@ -56,19 +73,24 @@ impl App {
             current_view,
             config,
             workspace_path,
+            views_path,
             should_quit: false,
             show_help: false,
             show_modal: false,
-            show_view_switcher: false,
             show_view_manager: false,
+            view_manager_state,
             search_active: false,
             search_query: String::new(),
+            search_cursor_row: 0,
+            search_cursor_col: 0,
             saving_view: false,
             view_name_input: String::new(),
-            view_manager_selected: 0,
             editing_view: false,
             editing_view_field: ViewEditField::Name,
             editing_view_text: String::new(),
+            task_edit_field: TaskEditField::Description,
+            editing_task_field: false,
+            task_edit_text: String::new(),
             file_watcher: None,
             dirty: true,
         }
@@ -126,15 +148,7 @@ impl App {
             command::handle_key(self, code, modifiers);
             return;
         }
-        if self.show_view_switcher {
-            self.handle_view_switcher_key(code);
-            return;
-        }
         if self.show_view_manager {
-            self.handle_view_manager_key(code);
-            return;
-        }
-        if self.editing_view {
             self.handle_view_manager_key(code);
             return;
         }
@@ -154,8 +168,7 @@ impl App {
             KeyCode::Char('S') => self.set_scheduled_tomorrow(),
             KeyCode::Char('b') => self.bump_scheduled(),
             KeyCode::Char('/') => self.start_search(),
-            KeyCode::Char('v') => self.show_view_switcher = true,
-            KeyCode::Char('V') => self.show_view_manager = true,
+            KeyCode::Char('v') => self.show_view_manager = true,
             KeyCode::Enter => self.open_modal(),
             KeyCode::Char('r') => self.rescan_vault(),
             _ => {}
@@ -235,6 +248,10 @@ impl App {
     fn start_search(&mut self) {
         self.search_active = true;
         self.search_query = self.current_view.query.clone();
+        // Set cursor to end of query
+        let lines: Vec<&str> = self.search_query.split('\n').collect();
+        self.search_cursor_row = lines.len().saturating_sub(1);
+        self.search_cursor_col = lines.last().map(|l| l.len()).unwrap_or(0);
     }
 
     fn open_modal(&mut self) {
@@ -256,24 +273,7 @@ impl App {
         self.dirty = true;
     }
 
-    fn handle_view_switcher_key(&mut self, code: KeyCode) {
-        match code {
-            KeyCode::Esc => self.show_view_switcher = false,
-            KeyCode::Char('j') | KeyCode::Down => {
-                // TODO: cycle through views
-            }
-            KeyCode::Char('k') | KeyCode::Up => {
-                // TODO: cycle through views
-            }
-            KeyCode::Enter => {
-                // TODO: select view
-                self.show_view_switcher = false;
-            }
-            _ => {}
-        }
-    }
-
-    fn handle_view_manager_key(&mut self, code: KeyCode) {
+    pub fn handle_view_manager_key(&mut self, code: KeyCode) {
         if self.editing_view {
             match code {
                 KeyCode::Esc => {
@@ -281,13 +281,14 @@ impl App {
                     self.editing_view_text.clear();
                 }
                 KeyCode::Enter => {
-                    // Save the edited field
-                    if let Some(view) = self.views.get_mut(self.view_manager_selected) {
-                        match self.editing_view_field {
-                            ViewEditField::Name => view.name = self.editing_view_text.clone(),
-                            ViewEditField::Query => view.query = self.editing_view_text.clone(),
-                            ViewEditField::SortBy => view.sort_by = self.editing_view_text.clone(),
-                            ViewEditField::GroupBy => view.group_by = self.editing_view_text.clone(),
+                    if let Some(idx) = self.view_manager_state.selected() {
+                        if let Some(view) = self.views.get_mut(idx) {
+                            match self.editing_view_field {
+                                ViewEditField::Name => view.name = self.editing_view_text.clone(),
+                                ViewEditField::Query => view.query = self.editing_view_text.clone(),
+                                ViewEditField::SortBy => view.sort_by = self.editing_view_text.clone(),
+                                ViewEditField::GroupBy => view.group_by = self.editing_view_text.clone(),
+                            }
                         }
                     }
                     self.editing_view = false;
@@ -312,59 +313,45 @@ impl App {
             KeyCode::Char('j') | KeyCode::Down
                 if !self.views.is_empty() =>
             {
-                self.view_manager_selected = (self.view_manager_selected + 1) % self.views.len();
+                let i = self.view_manager_state.selected().unwrap_or(0);
+                let next = if i >= self.views.len() - 1 { 0 } else { i + 1 };
+                self.view_manager_state.select(Some(next));
             }
             KeyCode::Char('k') | KeyCode::Up
                 if !self.views.is_empty() =>
             {
-                self.view_manager_selected = if self.view_manager_selected == 0 {
-                    self.views.len() - 1
-                } else {
-                    self.view_manager_selected - 1
-                };
+                let i = self.view_manager_state.selected().unwrap_or(0);
+                let prev = if i == 0 { self.views.len() - 1 } else { i - 1 };
+                self.view_manager_state.select(Some(prev));
             }
             KeyCode::Char('e') => {
-                // Edit selected view
-                if let Some(view) = self.views.get(self.view_manager_selected) {
-                    self.editing_view = true;
-                    self.editing_view_field = ViewEditField::Name;
-                    self.editing_view_text = view.name.clone();
-                }
-            }
-            KeyCode::Tab if self.editing_view => {
-                // Cycle through edit fields when editing
-                self.editing_view_field = match self.editing_view_field {
-                    ViewEditField::Name => ViewEditField::Query,
-                    ViewEditField::Query => ViewEditField::SortBy,
-                    ViewEditField::SortBy => ViewEditField::GroupBy,
-                    ViewEditField::GroupBy => ViewEditField::Name,
-                };
-                // Load the current value of the new field
-                if let Some(view) = self.views.get(self.view_manager_selected) {
-                    self.editing_view_text = match self.editing_view_field {
-                        ViewEditField::Name => view.name.clone(),
-                        ViewEditField::Query => view.query.clone(),
-                        ViewEditField::SortBy => view.sort_by.clone(),
-                        ViewEditField::GroupBy => view.group_by.clone(),
-                    };
+                if let Some(idx) = self.view_manager_state.selected() {
+                    if let Some(view) = self.views.get(idx) {
+                        self.editing_view = true;
+                        self.editing_view_field = ViewEditField::Name;
+                        self.editing_view_text = view.name.clone();
+                    }
                 }
             }
             KeyCode::Char('d')
-                if self.views.len() > 1 && self.view_manager_selected < self.views.len() =>
+                if self.views.len() > 1 =>
             {
-                // Delete selected view (but not the last one)
-                self.views.remove(self.view_manager_selected);
-                if self.view_manager_selected >= self.views.len() {
-                    self.view_manager_selected = self.views.len() - 1;
+                if let Some(idx) = self.view_manager_state.selected() {
+                    if idx < self.views.len() {
+                        self.views.remove(idx);
+                        let new_sel = if idx >= self.views.len() { self.views.len() - 1 } else { idx };
+                        self.view_manager_state.select(Some(new_sel));
+                        self.save_views();
+                    }
                 }
-                self.save_views();
             }
             KeyCode::Enter => {
-                // Switch to selected view
-                if let Some(view) = self.views.get(self.view_manager_selected) {
-                    self.current_view = view.clone();
-                    self.show_view_manager = false;
-                    self.dirty = true;
+                if let Some(idx) = self.view_manager_state.selected() {
+                    if let Some(view) = self.views.get(idx) {
+                        self.current_view = view.clone();
+                        self.show_view_manager = false;
+                        self.dirty = true;
+                    }
                 }
             }
             _ => {}
@@ -372,11 +359,7 @@ impl App {
     }
 
     fn save_views(&self) {
-        let views_path = dirs::config_dir()
-            .unwrap_or_else(|| std::path::PathBuf::from("."))
-            .join("taskboard")
-            .join("views.toml");
-        if let Err(e) = crate::storage::save_views(&self.views, &views_path) {
+        if let Err(e) = crate::storage::save_views(&self.views, &self.views_path) {
             log::warn!("Failed to save views: {}", e);
         }
     }
@@ -416,62 +399,21 @@ impl App {
         if self.search_active {
             command::draw(frame, self);
         }
-        if self.show_view_switcher {
-            draw_view_switcher(frame, self);
-        }
         if self.show_view_manager || self.editing_view {
             draw_view_manager(frame, self);
         }
     }
 }
 
-fn draw_view_switcher(frame: &mut ratatui::Frame, app: &App) {
-    use ratatui::layout::Rect;
-    use ratatui::style::{Color, Style};
-    use ratatui::text::Line;
-    use ratatui::widgets::{Block, Borders, Clear, List, ListItem};
-
-    let area = frame.area();
-    let popup_width = 40.min(area.width - 4);
-    let popup_height = (app.views.len() as u16 + 3).min(area.height - 4);
-    let x = (area.width - popup_width) / 2;
-    let y = (area.height - popup_height) / 2;
-    let popup_area = Rect::new(x, y, popup_width, popup_height);
-
-    frame.render_widget(Clear, popup_area);
-
-    let items: Vec<ListItem> = app
-        .views
-        .iter()
-        .map(|v| {
-            let style = if v.name == app.current_view.name {
-                Style::default().fg(Color::Black).bg(Color::White)
-            } else {
-                Style::default().fg(Color::White)
-            };
-            ListItem::new(Line::from(v.name.clone())).style(style)
-        })
-        .collect();
-
-    let list = List::new(items).block(
-        Block::default()
-            .borders(Borders::ALL)
-            .title("Switch View")
-            .style(Style::default().bg(Color::DarkGray)),
-    );
-
-    frame.render_widget(list, popup_area);
-}
-
 fn draw_view_manager(frame: &mut ratatui::Frame, app: &App) {
     use ratatui::layout::Rect;
     use ratatui::style::{Color, Modifier, Style};
     use ratatui::text::{Line, Span};
-    use ratatui::widgets::{Block, Borders, Clear, List, ListItem, Paragraph};
+    use ratatui::widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph};
 
     let area = frame.area();
     let popup_width = 60.min(area.width - 4);
-    let popup_height = (app.views.len() as u16 + 8).min(area.height - 4);
+    let popup_height = (app.views.len() as u16 + 5).min(area.height - 4);
     let x = (area.width - popup_width) / 2;
     let y = (area.height - popup_height) / 2;
     let popup_area = Rect::new(x, y, popup_width, popup_height);
@@ -479,7 +421,6 @@ fn draw_view_manager(frame: &mut ratatui::Frame, app: &App) {
     frame.render_widget(Clear, popup_area);
 
     if app.editing_view {
-        // Show edit interface
         let field_name = match app.editing_view_field {
             ViewEditField::Name => "Name",
             ViewEditField::Query => "Query",
@@ -488,7 +429,7 @@ fn draw_view_manager(frame: &mut ratatui::Frame, app: &App) {
         };
 
         let content = vec![
-            Line::from(format!("Editing view: {}", app.views.get(app.view_manager_selected).map(|v| v.name.as_str()).unwrap_or(""))),
+            Line::from(format!("Editing view: {}", app.views.get(app.view_manager_state.selected().unwrap_or(0)).map(|v| v.name.as_str()).unwrap_or(""))),
             Line::from(""),
             Line::from(vec![
                 Span::styled(format!("{}: ", field_name), Style::default().fg(Color::DarkGray)),
@@ -513,13 +454,12 @@ fn draw_view_manager(frame: &mut ratatui::Frame, app: &App) {
 
         frame.render_widget(paragraph, popup_area);
     } else {
-        // Show view list
         let items: Vec<ListItem> = app
             .views
             .iter()
             .enumerate()
             .map(|(i, v)| {
-                let style = if i == app.view_manager_selected {
+                let style = if Some(i) == app.view_manager_state.selected() {
                     Style::default().fg(Color::Black).bg(Color::White).add_modifier(Modifier::BOLD)
                 } else if v.name == app.current_view.name {
                     Style::default().fg(Color::Cyan)
@@ -531,22 +471,25 @@ fn draw_view_manager(frame: &mut ratatui::Frame, app: &App) {
             })
             .collect();
 
-        let list = List::new(items).block(
+        let help_line = Line::from(Span::styled(
+            "Enter: switch | e: edit | d: del | Esc: close",
+            Style::default().fg(Color::DarkGray),
+        ));
+
+        let help_item = ListItem::new(help_line);
+        let mut all_items = items;
+        all_items.push(help_item);
+
+        let list = List::new(all_items).block(
             Block::default()
                 .borders(Borders::ALL)
                 .title("Manage Views")
                 .style(Style::default().bg(Color::DarkGray)),
         );
 
-        frame.render_stateful_widget(list, popup_area, &mut ratatui::widgets::ListState::default().with_offset(app.view_manager_selected));
-
-        // Draw help text below the list
-        let help_area = Rect::new(popup_area.x + 1, popup_area.y + popup_area.height - 2, popup_area.width - 2, 1);
-        let help = Paragraph::new(Line::from(Span::styled(
-            "Enter: switch | e: edit | d: delete | Esc: close",
-            Style::default().fg(Color::DarkGray),
-        )));
-        frame.render_widget(help, help_area);
+        let mut state = ListState::default();
+        state.select(app.view_manager_state.selected());
+        frame.render_stateful_widget(list, popup_area, &mut state);
     }
 }
 
@@ -603,9 +546,11 @@ fn draw_help_overlay(frame: &mut ratatui::Frame) {
 #[cfg(test)]
 mod tests {
     use crate::config::{Config, WorkspaceConfig, DefaultsConfig, ThemeConfig};
-    use crate::task::{TaskStatus, Priority};
+    use crate::task::{Task, TaskStatus, Priority};
     use crate::view::View;
     use crate::test_helpers::sample_tasks;
+    use crate::ui::modal::EditField;
+    use crossterm::event::{KeyCode, KeyModifiers};
     use std::path::PathBuf;
 
     use super::App;
@@ -622,12 +567,21 @@ mod tests {
         vec![View::default()]
     }
 
+    fn test_app(tasks: Vec<Task>, views: Vec<View>) -> App {
+        let config = sample_config();
+        let mut app = App::new(config, tasks, views);
+        let dir = tempfile::tempdir().unwrap();
+        app.views_path = dir.path().join("views.toml");
+        // Leak the dir so it doesn't get deleted during the test
+        std::mem::forget(dir);
+        app
+    }
+
     #[test]
     fn test_app_new() {
-        let config = sample_config();
         let tasks = sample_tasks();
         let views = sample_views();
-        let app = App::new(config, tasks, views);
+        let app = test_app(tasks, views);
 
         assert_eq!(app.selected_index, 0);
         assert!(!app.should_quit);
@@ -637,10 +591,9 @@ mod tests {
 
     #[test]
     fn test_move_down() {
-        let config = sample_config();
         let tasks = sample_tasks();
         let views = sample_views();
-        let mut app = App::new(config, tasks, views);
+        let mut app = test_app(tasks, views);
         app.update_filtered_tasks();
 
         assert_eq!(app.selected_index, 0);
@@ -654,10 +607,9 @@ mod tests {
 
     #[test]
     fn test_move_up() {
-        let config = sample_config();
         let tasks = sample_tasks();
         let views = sample_views();
-        let mut app = App::new(config, tasks, views);
+        let mut app = test_app(tasks, views);
         app.update_filtered_tasks();
 
         assert_eq!(app.selected_index, 0);
@@ -669,9 +621,8 @@ mod tests {
 
     #[test]
     fn test_move_down_empty() {
-        let config = sample_config();
         let views = sample_views();
-        let mut app = App::new(config, vec![], views);
+        let mut app = test_app(vec![], views);
         app.update_filtered_tasks();
 
         app.move_down();
@@ -680,9 +631,8 @@ mod tests {
 
     #[test]
     fn test_move_up_empty() {
-        let config = sample_config();
         let views = sample_views();
-        let mut app = App::new(config, vec![], views);
+        let mut app = test_app(vec![], views);
         app.update_filtered_tasks();
 
         app.move_up();
@@ -691,10 +641,9 @@ mod tests {
 
     #[test]
     fn test_toggle_done() {
-        let config = sample_config();
         let tasks = sample_tasks();
         let views = sample_views();
-        let mut app = App::new(config, tasks, views);
+        let mut app = test_app(tasks, views);
         app.update_filtered_tasks();
 
         assert_eq!(app.tasks[0].status, TaskStatus::Todo);
@@ -706,10 +655,9 @@ mod tests {
 
     #[test]
     fn test_cycle_priority() {
-        let config = sample_config();
         let tasks = sample_tasks();
         let views = sample_views();
-        let mut app = App::new(config, tasks, views);
+        let mut app = test_app(tasks, views);
         app.update_filtered_tasks();
 
         assert_eq!(app.tasks[0].priority, Priority::None);
@@ -719,10 +667,9 @@ mod tests {
 
     #[test]
     fn test_set_due_date_today() {
-        let config = sample_config();
         let tasks = sample_tasks();
         let views = sample_views();
-        let mut app = App::new(config, tasks, views);
+        let mut app = test_app(tasks, views);
         app.update_filtered_tasks();
 
         app.selected_index = 2;
@@ -732,10 +679,9 @@ mod tests {
 
     #[test]
     fn test_set_due_date_tomorrow() {
-        let config = sample_config();
         let tasks = sample_tasks();
         let views = sample_views();
-        let mut app = App::new(config, tasks, views);
+        let mut app = test_app(tasks, views);
         app.update_filtered_tasks();
 
         app.set_due_date_tomorrow();
@@ -745,10 +691,9 @@ mod tests {
 
     #[test]
     fn test_set_scheduled_today() {
-        let config = sample_config();
         let tasks = sample_tasks();
         let views = sample_views();
-        let mut app = App::new(config, tasks, views);
+        let mut app = test_app(tasks, views);
         app.update_filtered_tasks();
 
         app.set_scheduled_today();
@@ -757,10 +702,9 @@ mod tests {
 
     #[test]
     fn test_set_scheduled_tomorrow() {
-        let config = sample_config();
         let tasks = sample_tasks();
         let views = sample_views();
-        let mut app = App::new(config, tasks, views);
+        let mut app = test_app(tasks, views);
         app.update_filtered_tasks();
 
         app.set_scheduled_tomorrow();
@@ -770,10 +714,9 @@ mod tests {
 
     #[test]
     fn test_bump_scheduled() {
-        let config = sample_config();
         let tasks = sample_tasks();
         let views = sample_views();
-        let mut app = App::new(config, tasks, views);
+        let mut app = test_app(tasks, views);
         app.update_filtered_tasks();
 
         app.selected_index = 2;
@@ -784,10 +727,9 @@ mod tests {
 
     #[test]
     fn test_bump_scheduled_no_existing() {
-        let config = sample_config();
         let tasks = sample_tasks();
         let views = sample_views();
-        let mut app = App::new(config, tasks, views);
+        let mut app = test_app(tasks, views);
         app.update_filtered_tasks();
 
         app.selected_index = 0;
@@ -798,11 +740,10 @@ mod tests {
 
     #[test]
     fn test_update_filtered_tasks() {
-        let config = sample_config();
         let tasks = sample_tasks();
         let mut views = sample_views();
         views[0].query = "not done".to_string();
-        let mut app = App::new(config, tasks, views);
+        let mut app = test_app(tasks, views);
         app.update_filtered_tasks();
 
         assert_eq!(app.filtered_indices.len(), 2);
@@ -810,10 +751,9 @@ mod tests {
 
     #[test]
     fn test_update_filtered_tasks_empty_query() {
-        let config = sample_config();
         let tasks = sample_tasks();
         let views = sample_views();
-        let mut app = App::new(config, tasks, views);
+        let mut app = test_app(tasks, views);
         app.update_filtered_tasks();
 
         assert_eq!(app.filtered_indices.len(), 3);
@@ -821,19 +761,17 @@ mod tests {
 
     #[test]
     fn test_default_view_used_when_empty() {
-        let config = sample_config();
         let tasks = sample_tasks();
-        let app = App::new(config, tasks, vec![]);
+        let app = test_app(tasks, vec![]);
 
         assert_eq!(app.current_view.name, "All Tasks");
     }
 
     #[test]
     fn test_mutations_persist() {
-        let config = sample_config();
         let tasks = sample_tasks();
         let views = sample_views();
-        let mut app = App::new(config, tasks, views);
+        let mut app = test_app(tasks, views);
         app.update_filtered_tasks();
 
         app.toggle_done();
@@ -847,5 +785,314 @@ mod tests {
 
         app.update_filtered_tasks();
         assert_eq!(app.tasks[0].priority, Priority::High);
+    }
+
+    #[test]
+    fn test_view_manager_navigation() {
+        let tasks = sample_tasks();
+        let mut views = vec![
+            View::new("View1", "not done", "", ""),
+            View::new("View2", "done", "", ""),
+            View::new("View3", "", "", ""),
+        ];
+        let mut app = test_app(tasks, views);
+        app.show_view_manager = true;
+
+        assert_eq!(app.view_manager_state.selected(), Some(0));
+
+        app.handle_view_manager_key(KeyCode::Down);
+        assert_eq!(app.view_manager_state.selected(), Some(1));
+
+        app.handle_view_manager_key(KeyCode::Down);
+        assert_eq!(app.view_manager_state.selected(), Some(2));
+
+        app.handle_view_manager_key(KeyCode::Down);
+        assert_eq!(app.view_manager_state.selected(), Some(0)); // wraps
+
+        app.handle_view_manager_key(KeyCode::Up);
+        assert_eq!(app.view_manager_state.selected(), Some(2)); // wraps back
+    }
+
+    #[test]
+    fn test_view_manager_select() {
+        let tasks = sample_tasks();
+        let mut views = vec![
+            View::new("View1", "not done", "", ""),
+            View::new("View2", "done", "", ""),
+        ];
+        let mut app = test_app(tasks, views);
+        app.show_view_manager = true;
+
+        app.handle_view_manager_key(KeyCode::Down);
+        app.handle_view_manager_key(KeyCode::Enter);
+        assert_eq!(app.current_view.name, "View2");
+        assert!(!app.show_view_manager);
+    }
+
+    #[test]
+    fn test_view_manager_delete() {
+        let tasks = sample_tasks();
+        let mut views = vec![
+            View::new("View1", "not done", "", ""),
+            View::new("View2", "done", "", ""),
+            View::new("View3", "", "", ""),
+        ];
+        let mut app = test_app(tasks, views);
+        app.show_view_manager = true;
+
+        app.handle_view_manager_key(KeyCode::Down); // select View2
+        app.handle_view_manager_key(KeyCode::Char('d')); // delete View2
+        assert_eq!(app.views.len(), 2);
+        assert_eq!(app.views[0].name, "View1");
+        assert_eq!(app.views[1].name, "View3");
+    }
+
+    #[test]
+    fn test_view_manager_esc() {
+        let tasks = sample_tasks();
+        let views = sample_views();
+        let mut app = test_app(tasks, views);
+        app.show_view_manager = true;
+
+        app.handle_view_manager_key(KeyCode::Esc);
+        assert!(!app.show_view_manager);
+    }
+
+    #[test]
+    fn test_task_edit_modal_fields() {
+        use crate::ui::modal::EditField;
+
+        let tasks = sample_tasks();
+        let views = sample_views();
+        let mut app = test_app(tasks, views);
+        app.update_filtered_tasks();
+        app.show_modal = true;
+
+        assert_eq!(app.task_edit_field, EditField::Description);
+
+        app.handle_key(KeyCode::Tab, KeyModifiers::NONE);
+        assert_eq!(app.task_edit_field, EditField::Status);
+
+        app.handle_key(KeyCode::Tab, KeyModifiers::NONE);
+        assert_eq!(app.task_edit_field, EditField::Priority);
+
+        app.handle_key(KeyCode::Tab, KeyModifiers::NONE);
+        assert_eq!(app.task_edit_field, EditField::DueDate);
+
+        app.handle_key(KeyCode::Tab, KeyModifiers::NONE);
+        assert_eq!(app.task_edit_field, EditField::ScheduledDate);
+
+        app.handle_key(KeyCode::Tab, KeyModifiers::NONE);
+        assert_eq!(app.task_edit_field, EditField::Recurrence);
+
+        app.handle_key(KeyCode::Tab, KeyModifiers::NONE);
+        assert_eq!(app.task_edit_field, EditField::Description); // wraps
+    }
+
+    #[test]
+    fn test_task_edit_backward_navigation() {
+        use crate::ui::modal::EditField;
+
+        let tasks = sample_tasks();
+        let views = sample_views();
+        let mut app = test_app(tasks, views);
+        app.update_filtered_tasks();
+        app.show_modal = true;
+
+        assert_eq!(app.task_edit_field, EditField::Description);
+
+        app.handle_key(KeyCode::BackTab, KeyModifiers::SHIFT);
+        assert_eq!(app.task_edit_field, EditField::Recurrence); // wraps backward
+    }
+
+    #[test]
+    fn test_task_edit_field_edit() {
+        let tasks = sample_tasks();
+        let views = sample_views();
+        let mut app = test_app(tasks, views);
+        app.update_filtered_tasks();
+        app.show_modal = true;
+
+        // Start editing description
+        app.handle_key(KeyCode::Char('e'), KeyModifiers::NONE);
+        assert!(app.editing_task_field);
+        assert_eq!(app.task_edit_text, "Buy groceries");
+
+        // Clear the field
+        for _ in 0..13 {
+            app.handle_key(KeyCode::Backspace, KeyModifiers::NONE);
+        }
+        assert_eq!(app.task_edit_text, "");
+
+        // Type new description
+        for c in "Cook".chars() {
+            app.handle_key(KeyCode::Char(c), KeyModifiers::NONE);
+        }
+
+        // Save
+        app.handle_key(KeyCode::Enter, KeyModifiers::NONE);
+        assert!(!app.editing_task_field);
+        assert_eq!(app.tasks[0].description, "Cook");
+    }
+
+    #[test]
+    fn test_task_edit_cancel() {
+        let tasks = sample_tasks();
+        let views = sample_views();
+        let mut app = test_app(tasks, views);
+        app.update_filtered_tasks();
+        app.show_modal = true;
+
+        // Start editing description
+        app.handle_key(KeyCode::Char('e'), KeyModifiers::NONE);
+        assert!(app.editing_task_field);
+
+        // Cancel
+        app.handle_key(KeyCode::Esc, KeyModifiers::NONE);
+        assert!(!app.editing_task_field);
+        assert_eq!(app.tasks[0].description, "Buy groceries"); // unchanged
+    }
+
+    #[test]
+    fn test_task_edit_status_field() {
+        let tasks = sample_tasks();
+        let views = sample_views();
+        let mut app = test_app(tasks, views);
+        app.update_filtered_tasks();
+        app.show_modal = true;
+
+        // Navigate to status field
+        app.handle_key(KeyCode::Tab, KeyModifiers::NONE);
+        assert_eq!(app.task_edit_field, EditField::Status);
+
+        // Start editing
+        app.handle_key(KeyCode::Char('e'), KeyModifiers::NONE);
+        assert_eq!(app.task_edit_text, "todo");
+
+        // Clear and type "done"
+        for _ in 0..4 {
+            app.handle_key(KeyCode::Backspace, KeyModifiers::NONE);
+        }
+        for c in "done".chars() {
+            app.handle_key(KeyCode::Char(c), KeyModifiers::NONE);
+        }
+
+        // Save
+        app.handle_key(KeyCode::Enter, KeyModifiers::NONE);
+        assert_eq!(app.tasks[0].status, TaskStatus::Done);
+    }
+
+    #[test]
+    fn test_task_edit_priority_field() {
+        let tasks = sample_tasks();
+        let views = sample_views();
+        let mut app = test_app(tasks, views);
+        app.update_filtered_tasks();
+        app.show_modal = true;
+
+        // Navigate to priority field
+        app.handle_key(KeyCode::Tab, KeyModifiers::NONE);
+        app.handle_key(KeyCode::Tab, KeyModifiers::NONE);
+        assert_eq!(app.task_edit_field, EditField::Priority);
+
+        // Start editing
+        app.handle_key(KeyCode::Char('e'), KeyModifiers::NONE);
+        assert_eq!(app.task_edit_text, "");
+
+        // Type "high"
+        for c in "high".chars() {
+            app.handle_key(KeyCode::Char(c), KeyModifiers::NONE);
+        }
+
+        // Save
+        app.handle_key(KeyCode::Enter, KeyModifiers::NONE);
+        assert_eq!(app.tasks[0].priority, Priority::High);
+    }
+
+    #[test]
+    fn test_task_edit_date_field() {
+        let tasks = sample_tasks();
+        let views = sample_views();
+        let mut app = test_app(tasks, views);
+        app.update_filtered_tasks();
+        app.show_modal = true;
+
+        // Navigate to due date field
+        app.handle_key(KeyCode::Tab, KeyModifiers::NONE);
+        app.handle_key(KeyCode::Tab, KeyModifiers::NONE);
+        app.handle_key(KeyCode::Tab, KeyModifiers::NONE);
+        assert_eq!(app.task_edit_field, EditField::DueDate);
+
+        // Start editing - task[0] has due_date 2026-06-15
+        app.handle_key(KeyCode::Char('e'), KeyModifiers::NONE);
+        assert_eq!(app.task_edit_text, "2026-06-15");
+
+        // Clear and type "tomorrow"
+        for _ in 0..10 {
+            app.handle_key(KeyCode::Backspace, KeyModifiers::NONE);
+        }
+        for c in "tomorrow".chars() {
+            app.handle_key(KeyCode::Char(c), KeyModifiers::NONE);
+        }
+
+        // Save
+        app.handle_key(KeyCode::Enter, KeyModifiers::NONE);
+        let tomorrow = chrono::Local::now().date_naive() + chrono::Duration::days(1);
+        assert_eq!(app.tasks[0].due_date, Some(tomorrow));
+    }
+
+    #[test]
+    fn test_task_edit_clear_date() {
+        let tasks = sample_tasks();
+        let views = sample_views();
+        let mut app = test_app(tasks, views);
+        app.update_filtered_tasks();
+        app.show_modal = true;
+
+        // Navigate to due date field
+        app.handle_key(KeyCode::Tab, KeyModifiers::NONE);
+        app.handle_key(KeyCode::Tab, KeyModifiers::NONE);
+        app.handle_key(KeyCode::Tab, KeyModifiers::NONE);
+        assert_eq!(app.task_edit_field, EditField::DueDate);
+
+        // Start editing
+        app.handle_key(KeyCode::Char('e'), KeyModifiers::NONE);
+
+        // Type "none"
+        for c in "none".chars() {
+            app.handle_key(KeyCode::Char(c), KeyModifiers::NONE);
+        }
+
+        // Save
+        app.handle_key(KeyCode::Enter, KeyModifiers::NONE);
+        assert_eq!(app.tasks[0].due_date, None);
+    }
+
+    #[test]
+    fn test_task_edit_recurrence_field() {
+        let tasks = sample_tasks();
+        let views = sample_views();
+        let mut app = test_app(tasks, views);
+        app.update_filtered_tasks();
+        app.show_modal = true;
+
+        // Navigate to recurrence field
+        for _ in 0..5 {
+            app.handle_key(KeyCode::Tab, KeyModifiers::NONE);
+        }
+        assert_eq!(app.task_edit_field, EditField::Recurrence);
+
+        // Start editing - task[0] has no recurrence
+        app.handle_key(KeyCode::Char('e'), KeyModifiers::NONE);
+        assert_eq!(app.task_edit_text, "");
+
+        // Type "every month"
+        for c in "every month".chars() {
+            app.handle_key(KeyCode::Char(c), KeyModifiers::NONE);
+        }
+
+        // Save
+        app.handle_key(KeyCode::Enter, KeyModifiers::NONE);
+        assert_eq!(app.tasks[0].recurrence, Some("every month".to_string()));
     }
 }

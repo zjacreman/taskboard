@@ -4,7 +4,7 @@ use std::path::PathBuf;
 pub mod parser;
 pub mod query;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TaskStatus {
     Todo,
     Done,
@@ -19,7 +19,7 @@ impl TaskStatus {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Priority {
     None,
     Lowest,
@@ -49,7 +49,7 @@ impl Priority {
         }
     }
 
-    pub fn to_emoji(&self) -> &str {
+    pub fn to_emoji(self) -> &'static str {
         match self {
             Priority::High => "⏫",
             Priority::Medium => "🔼",
