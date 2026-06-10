@@ -449,7 +449,7 @@ fn draw_view_manager(frame: &mut ratatui::Frame, app: &App) {
         frame.render_widget(textarea, chunks[2]);
 
         let help = Paragraph::new(Span::styled(
-            "Tab: next field | Enter: save | Esc: cancel",
+            "Enter: save | Esc: cancel",
             Style::default().fg(Color::Gray),
         ));
         frame.render_widget(help, chunks[3]);
@@ -794,7 +794,7 @@ mod tests {
     #[test]
     fn test_view_manager_navigation() {
         let tasks = sample_tasks();
-        let mut views = vec![
+        let views = vec![
             View::new("View1", "not done", "", ""),
             View::new("View2", "done", "", ""),
             View::new("View3", "", "", ""),
@@ -820,7 +820,7 @@ mod tests {
     #[test]
     fn test_view_manager_select() {
         let tasks = sample_tasks();
-        let mut views = vec![
+        let views = vec![
             View::new("View1", "not done", "", ""),
             View::new("View2", "done", "", ""),
         ];
@@ -836,7 +836,7 @@ mod tests {
     #[test]
     fn test_view_manager_delete() {
         let tasks = sample_tasks();
-        let mut views = vec![
+        let views = vec![
             View::new("View1", "not done", "", ""),
             View::new("View2", "done", "", ""),
             View::new("View3", "", "", ""),
