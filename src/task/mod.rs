@@ -21,11 +21,11 @@ impl TaskStatus {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Priority {
+    None,
     Lowest,
     Low,
     Medium,
     High,
-    None,
 }
 
 impl Priority {
