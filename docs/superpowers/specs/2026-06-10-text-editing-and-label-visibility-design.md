@@ -8,9 +8,9 @@
 
 ## Solution
 
-### 1. Add `ratatui-textarea` dependency
+### 1. Add `tui-textarea` dependency
 
-Add `ratatui-textarea = "0.9"` to `Cargo.toml`. This is the official ratatui org fork with 141k downloads, supporting both single-line and multi-line text editing with full cursor movement, undo/redo, and crossterm integration.
+Add `tui-textarea = "0.6"` to `Cargo.toml`. v0.6.x is the version compatible with ratatui 0.28 (v0.7.0 bumped to ratatui 0.29). Supports both single-line and multi-line text editing with full cursor movement, undo/redo, and crossterm integration. Import as `tui_textarea::TextArea`.
 
 ### 2. Label color fix
 
@@ -77,7 +77,7 @@ Existing tests use `KeyCode::Char` and `KeyCode::Backspace` — these still work
 
 | File | Change |
 |------|--------|
-| `Cargo.toml` | Add `ratatui-textarea = "0.9"` |
+| `Cargo.toml` | Add `tui-textarea = "0.6"` |
 | `src/ui/mod.rs` | Replace App fields, update view manager editing/drawing |
 | `src/ui/modal.rs` | Replace manual editing with TextArea, fix label colors |
 | `src/ui/command.rs` | Replace manual editing with TextArea for both search and save-view, fix label colors |
