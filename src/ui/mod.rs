@@ -21,6 +21,7 @@ pub struct App {
     pub config: Config,
     pub should_quit: bool,
     pub show_help: bool,
+    pub file_watcher: Option<crate::vault::FileWatcher>,
 }
 
 impl App {
@@ -35,6 +36,7 @@ impl App {
             config,
             should_quit: false,
             show_help: false,
+            file_watcher: None,
         }
     }
 
@@ -47,6 +49,20 @@ impl App {
                 if let Event::Key(key) = event::read()? {
                     if key.kind == KeyEventKind::Press {
                         self.handle_key(key.code);
+                    }
+                }
+            }
+
+            // Poll for filesystem changes
+            if let Some(watcher) = &self.file_watcher {
+                let changed = watcher.poll_changes();
+                for path in changed {
+                    if let Ok(content) = std::fs::read_to_string(&path) {
+                        // Remove old tasks from this file
+                        self.tasks.retain(|t| t.source_file != path);
+                        // Parse and add new tasks
+                        let new_tasks = crate::task::parser::parse_file(&content, &path);
+                        self.tasks.extend(new_tasks);
                     }
                 }
             }

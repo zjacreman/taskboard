@@ -39,8 +39,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .join("views.toml");
     let views = storage::load_views(&views_path)?;
 
+    // Set up filesystem watcher
+    let file_watcher = vault::FileWatcher::new(&workspace_path).ok();
+
     let mut terminal = ratatui::init();
     let mut app = ui::App::new(config, all_tasks, views);
+    app.file_watcher = file_watcher;
     app.run(&mut terminal)?;
     ratatui::restore();
 
