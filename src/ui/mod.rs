@@ -1099,4 +1099,73 @@ mod tests {
         app.handle_key(key_event(KeyCode::Enter, KeyModifiers::NONE));
         assert_eq!(app.tasks[0].recurrence, Some("every month".to_string()));
     }
+
+    #[test]
+    fn test_task_edit_cursor_insert() {
+        let tasks = sample_tasks();
+        let views = sample_views();
+        let mut app = test_app(tasks, views);
+        app.update_filtered_tasks();
+        app.show_modal = true;
+
+        // Start editing description ("Buy groceries")
+        app.handle_key(key_event(KeyCode::Char('e'), KeyModifiers::NONE));
+        assert!(app.task_edit.is_some());
+
+        // Move cursor left twice (from end)
+        app.handle_key(key_event(KeyCode::Left, KeyModifiers::NONE));
+        app.handle_key(key_event(KeyCode::Left, KeyModifiers::NONE));
+
+        // Insert 'x' at cursor position
+        app.handle_key(key_event(KeyCode::Char('x'), KeyModifiers::NONE));
+
+        // Verify text is "Buy groceriexs"
+        let text = &app.task_edit.as_ref().unwrap().lines()[0];
+        assert_eq!(text, "Buy groceriexs");
+
+        // Save
+        app.handle_key(key_event(KeyCode::Enter, KeyModifiers::NONE));
+        assert_eq!(app.tasks[0].description, "Buy groceriexs");
+    }
+
+    #[test]
+    fn test_task_edit_home_end() {
+        let tasks = sample_tasks();
+        let views = sample_views();
+        let mut app = test_app(tasks, views);
+        app.update_filtered_tasks();
+        app.show_modal = true;
+
+        // Start editing description
+        app.handle_key(key_event(KeyCode::Char('e'), KeyModifiers::NONE));
+
+        // Move to start
+        app.handle_key(key_event(KeyCode::Home, KeyModifiers::NONE));
+
+        // Insert at start
+        app.handle_key(key_event(KeyCode::Char('!'), KeyModifiers::NONE));
+
+        // Verify
+        let text = &app.task_edit.as_ref().unwrap().lines()[0];
+        assert_eq!(text, "!Buy groceries");
+    }
+
+    #[test]
+    fn test_search_alt_enter_submit() {
+        let tasks = sample_tasks();
+        let views = sample_views();
+        let mut app = test_app(tasks, views);
+        app.start_search();
+
+        // Type a query
+        for c in "done".chars() {
+            app.handle_key(key_event(KeyCode::Char(c), KeyModifiers::NONE));
+        }
+
+        // Submit with Alt+Enter
+        app.handle_key(key_event(KeyCode::Enter, KeyModifiers::ALT));
+
+        assert!(app.search_textarea.is_none());
+        assert_eq!(app.current_view.query, "done");
+    }
 }
