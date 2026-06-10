@@ -2,7 +2,10 @@ use crate::ui::App;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph};
+use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph};
+
+const COMPACT_WIDTH: usize = 80;
+const WIDE_WIDTH: usize = 120;
 
 pub fn draw(frame: &mut ratatui::Frame, app: &App) {
     let chunks = Layout::default()
@@ -17,14 +20,32 @@ pub fn draw(frame: &mut ratatui::Frame, app: &App) {
     draw_status_bar(frame, app, chunks[1]);
 }
 
+fn format_due_date(date: chrono::NaiveDate, width: usize) -> String {
+    if width < COMPACT_WIDTH {
+        format!(" 📅{}", date.format("%m-%d"))
+    } else {
+        format!(" 📅 {}", date.format("%Y-%m-%d"))
+    }
+}
+
+fn format_scheduled_date(date: chrono::NaiveDate, width: usize) -> String {
+    if width < COMPACT_WIDTH {
+        format!(" 🛫{}", date.format("%m-%d"))
+    } else {
+        format!(" 🛫 {}", date.format("%Y-%m-%d"))
+    }
+}
+
 fn draw_task_list(frame: &mut ratatui::Frame, app: &App, area: Rect) {
     let width = area.width as usize;
 
     let items: Vec<ListItem> = app
-        .filtered_tasks
+        .filtered_indices
         .iter()
         .enumerate()
-        .map(|(i, task)| {
+        .map(|(i, &task_idx)| {
+            let task = &app.tasks[task_idx];
+
             let status = if task.status == crate::task::TaskStatus::Done {
                 "[x]"
             } else {
@@ -38,30 +59,19 @@ fn draw_task_list(frame: &mut ratatui::Frame, app: &App, area: Rect) {
                 format!("{} ", priority)
             };
 
-            let due = task
-                .due_date
-                .map(|d| {
-                    if width < 80 {
-                        format!(" 📅{}", d.format("%m-%d"))
-                    } else {
-                        format!(" 📅 {}", d.format("%Y-%m-%d"))
-                    }
-                })
+            let due = task.due_date
+                .map(|d| format_due_date(d, width))
                 .unwrap_or_default();
 
-            let scheduled = task
-                .scheduled_date
-                .map(|d| {
-                    if width < 80 {
-                        format!(" 🛫{}", d.format("%m-%d"))
-                    } else {
-                        format!(" 🛫 {}", d.format("%Y-%m-%d"))
-                    }
-                })
+            let scheduled = task.scheduled_date
+                .map(|d| format_scheduled_date(d, width))
                 .unwrap_or_default();
 
-            let source = if width >= 120 {
-                format!(" {}", task.source_file.display())
+            let source = if width >= WIDE_WIDTH {
+                let rel = app.workspace_path.as_ref()
+                    .and_then(|wp| task.source_file.strip_prefix(wp).ok())
+                    .unwrap_or(&task.source_file);
+                format!(" {}", rel.display())
             } else {
                 String::new()
             };
@@ -87,21 +97,25 @@ fn draw_task_list(frame: &mut ratatui::Frame, app: &App, area: Rect) {
         })
         .collect();
 
-    let list = List::new(items).block(
-        Block::default()
-            .borders(Borders::ALL)
-            .title(format!("TaskBoard - {}", app.current_view.name)),
-    );
+    let list = List::new(items)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(format!("TaskBoard - {}", app.current_view.name)),
+        );
 
-    frame.render_widget(list, area);
+    let mut state = ListState::default();
+    state.select(Some(app.selected_index));
+
+    frame.render_stateful_widget(list, area, &mut state);
 }
 
 fn draw_status_bar(frame: &mut ratatui::Frame, app: &App, area: Rect) {
-    let total = app.filtered_tasks.len();
+    let total = app.filtered_indices.len();
     let done = app
-        .filtered_tasks
+        .filtered_indices
         .iter()
-        .filter(|t| t.status == crate::task::TaskStatus::Done)
+        .filter(|&&idx| app.tasks[idx].status == crate::task::TaskStatus::Done)
         .count();
     let open = total - done;
 

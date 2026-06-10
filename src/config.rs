@@ -1,5 +1,5 @@
 use serde::Deserialize;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
@@ -13,7 +13,7 @@ pub struct Config {
 
 #[derive(Debug, Deserialize)]
 pub struct WorkspaceConfig {
-    pub path: String,
+    pub path: PathBuf,
 }
 
 #[derive(Debug, Deserialize)]
@@ -96,7 +96,7 @@ view = "All Tasks"
 colors = "dark"
 "#;
         let config: Config = toml::from_str(toml).unwrap();
-        assert_eq!(config.workspace.path, "/home/user/vault");
+        assert_eq!(config.workspace.path, PathBuf::from("/home/user/vault"));
         assert_eq!(config.defaults.view, "All Tasks");
         assert_eq!(config.theme.colors, "dark");
     }
@@ -108,7 +108,7 @@ colors = "dark"
 path = "/tmp/vault"
 "#;
         let config: Config = toml::from_str(toml).unwrap();
-        assert_eq!(config.workspace.path, "/tmp/vault");
+        assert_eq!(config.workspace.path, PathBuf::from("/tmp/vault"));
         assert_eq!(config.defaults.view, "All Tasks"); // default
         assert_eq!(config.theme.colors, "dark"); // default
     }
@@ -119,7 +119,7 @@ path = "/tmp/vault"
         writeln!(file, "[workspace]\npath = \"/tmp/test\"").unwrap();
 
         let config = Config::from_file(file.path()).unwrap();
-        assert_eq!(config.workspace.path, "/tmp/test");
+        assert_eq!(config.workspace.path, PathBuf::from("/tmp/test"));
     }
 
     #[test]
