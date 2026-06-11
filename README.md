@@ -35,6 +35,18 @@ view = "All Tasks"
 
 [theme]
 colors = "dark"
+
+[[views]]
+name = "All Tasks"
+query = ""
+sort_by = "due_date"
+group_by = ""
+
+[[views]]
+name = "Overdue"
+query = "due < today"
+sort_by = "due_date"
+group_by = ""
 ```
 
 ## Keybindings
