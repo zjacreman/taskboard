@@ -3,7 +3,7 @@ mod task;
 mod vault;
 mod view;
 mod ui;
-mod storage;
+
 #[cfg(test)]
 mod test_helpers;
 
@@ -69,7 +69,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     eprintln!("Warning: could not create config directory: {}", e);
                 } else {
                     let toml = format!(
-                        "[workspace]\npath = \"{}\"\n\n[defaults]\nview = \"All Tasks\"\n\n[theme]\ncolors = \"dark\"\n",
+                        "[workspace]\npath = \"{}\"\n\n[defaults]\nview = \"All Tasks\"\n\n[theme]\ncolors = \"dark\"\n\n[[views]]\nname = \"All Tasks\"\nquery = \"\"\nsort_by = \"due_date\"\ngroup_by = \"\"\n",
                         config.workspace.path.display()
                     );
                     if let Err(e) = std::fs::write(&config_path, toml) {
@@ -95,17 +95,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    let views_path = dirs::config_dir()
+    let config_path = dirs::config_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join("taskboard")
-        .join("views.toml");
-    let views = storage::load_views(&views_path)?;
+        .join("config.toml");
+
+    let views: Vec<crate::view::View> = config.views.iter().map(|v| {
+        crate::view::View::new(&v.name, &v.query, &v.sort_by, &v.group_by)
+    }).collect();
 
     let file_watcher = vault::FileWatcher::new(&workspace_path).ok();
 
     let mut terminal = ratatui::init();
     let _guard = TerminalGuard;
-    let mut app = ui::App::new(config, all_tasks, views);
+    let mut app = ui::App::new(config, all_tasks, views, config_path);
     app.file_watcher = file_watcher;
     app.run(&mut terminal)?;
 
