@@ -386,7 +386,15 @@ impl App {
         }
     }
 
-    fn save_config(&self) {
+    fn save_config(&mut self) {
+        self.config.views = self.views.iter().map(|v| {
+            crate::config::ViewConfig {
+                name: v.name.clone(),
+                query: v.query.clone(),
+                sort_by: v.sort_by.clone(),
+                group_by: v.group_by.clone(),
+            }
+        }).collect();
         if let Err(e) = self.config.save(&self.config_path) {
             log::warn!("Failed to save config: {}", e);
         }
@@ -573,7 +581,7 @@ fn draw_help_overlay(frame: &mut ratatui::Frame) {
         Line::from("Views:"),
         Line::from("  /         Search/query"),
         Line::from("  v         Switch view"),
-        Line::from("  V         Manage views (e:edit, d:delete)"),
+        Line::from("  V         Manage views (e:edit, d:del, s:default)"),
         Line::from(""),
         Line::from("  Enter     Edit task (modal)"),
         Line::from("  r         Rescan vault"),
