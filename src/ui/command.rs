@@ -65,7 +65,7 @@ fn handle_save_view_key(app: &mut App, key: KeyEvent) {
             );
 
             app.views.push(view);
-            app.save_views();
+            app.save_config();
 
             app.save_view_edit = None;
             app.search_textarea = None;
@@ -88,7 +88,7 @@ fn handle_overwrite_confirm_key(app: &mut App, key: KeyEvent) {
                 &app.current_view.sort_by,
                 &app.current_view.group_by,
             );
-            app.save_views();
+            app.save_config();
             app.save_view_confirm_overwrite = None;
             app.save_view_edit = None;
             app.search_textarea = None;

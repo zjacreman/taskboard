@@ -23,7 +23,7 @@ pub struct App {
     pub current_view: View,
     pub config: Config,
     pub workspace_path: Option<std::path::PathBuf>,
-    pub views_path: std::path::PathBuf,
+    pub config_path: std::path::PathBuf,
     pub should_quit: bool,
     pub show_help: bool,
     pub show_modal: bool,
@@ -51,13 +51,13 @@ pub enum ViewEditField {
 }
 
 impl App {
-    pub fn new(config: Config, tasks: Vec<Task>, views: Vec<View>) -> Self {
-        let current_view = views.first().cloned().unwrap_or_default();
+    pub fn new(config: Config, tasks: Vec<Task>, views: Vec<View>, config_path: std::path::PathBuf) -> Self {
+        let current_view = views.iter()
+            .find(|v| v.name == config.defaults.view)
+            .or(views.first())
+            .cloned()
+            .unwrap_or_default();
         let workspace_path = Some(config.workspace.path.clone());
-        let views_path = dirs::config_dir()
-            .unwrap_or_else(|| std::path::PathBuf::from("."))
-            .join("taskboard")
-            .join("views.toml");
         let mut view_manager_state = ListState::default();
         if !views.is_empty() {
             view_manager_state.select(Some(0));
@@ -70,7 +70,7 @@ impl App {
             current_view,
             config,
             workspace_path,
-            views_path,
+            config_path,
             should_quit: false,
             show_help: false,
             show_modal: false,
@@ -314,7 +314,7 @@ impl App {
                         }
                     }
                     self.view_edit = None;
-                    self.save_views();
+                    self.save_config();
                 }
                 _ => {
                     if let Some(textarea) = &mut self.view_edit {
@@ -361,7 +361,15 @@ impl App {
                         self.views.remove(idx);
                         let new_sel = if idx >= self.views.len() { self.views.len() - 1 } else { idx };
                         self.view_manager_state.select(Some(new_sel));
-                        self.save_views();
+                        self.save_config();
+                    }
+                }
+            }
+            KeyCode::Char('s') => {
+                if let Some(idx) = self.view_manager_state.selected() {
+                    if let Some(view) = self.views.get(idx) {
+                        self.config.defaults.view = view.name.clone();
+                        self.save_config();
                     }
                 }
             }
@@ -378,9 +386,9 @@ impl App {
         }
     }
 
-    fn save_views(&self) {
-        if let Err(e) = crate::storage::save_views(&self.views, &self.views_path) {
-            log::warn!("Failed to save views: {}", e);
+    fn save_config(&self) {
+        if let Err(e) = self.config.save(&self.config_path) {
+            log::warn!("Failed to save config: {}", e);
         }
     }
 
@@ -615,9 +623,9 @@ mod tests {
 
     fn test_app(tasks: Vec<Task>, views: Vec<View>) -> App {
         let config = sample_config();
-        let mut app = App::new(config, tasks, views);
         let dir = tempfile::tempdir().unwrap();
-        app.views_path = dir.path().join("views.toml");
+        let config_path = dir.path().join("config.toml");
+        let app = App::new(config, tasks, views, config_path);
         // Leak the dir so it doesn't get deleted during the test
         std::mem::forget(dir);
         app
@@ -1410,5 +1418,57 @@ mod tests {
         assert_eq!(app.tasks[app.filtered_indices[1]].source_file, PathBuf::from("a.md"));
         assert_eq!(app.tasks[app.filtered_indices[1]].line_number, 2);
         assert_eq!(app.tasks[app.filtered_indices[2]].source_file, PathBuf::from("b.md"));
+    }
+
+    #[test]
+    fn test_default_view_from_config() {
+        let tasks = sample_tasks();
+        let views = vec![
+            View::new("All Tasks", "", "", ""),
+            View::new("Overdue", "due < today", "", ""),
+        ];
+        let mut config = sample_config();
+        config.defaults.view = "Overdue".to_string();
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("config.toml");
+        let app = App::new(config, tasks, views, config_path);
+        std::mem::forget(dir);
+
+        assert_eq!(app.current_view.name, "Overdue");
+    }
+
+    #[test]
+    fn test_default_view_fallback_no_match() {
+        let tasks = sample_tasks();
+        let views = vec![
+            View::new("View1", "not done", "", ""),
+            View::new("View2", "done", "", ""),
+        ];
+        let mut config = sample_config();
+        config.defaults.view = "Nonexistent".to_string();
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("config.toml");
+        let app = App::new(config, tasks, views, config_path);
+        std::mem::forget(dir);
+
+        assert_eq!(app.current_view.name, "View1"); // falls back to first
+    }
+
+    #[test]
+    fn test_view_manager_set_default() {
+        let tasks = sample_tasks();
+        let views = vec![
+            View::new("View1", "not done", "", ""),
+            View::new("View2", "done", "", ""),
+        ];
+        let mut app = test_app(tasks, views);
+        app.show_view_manager = true;
+
+        // Navigate to View2
+        app.handle_view_manager_key(key_event(KeyCode::Down, KeyModifiers::NONE));
+        // Set as default
+        app.handle_view_manager_key(key_event(KeyCode::Char('s'), KeyModifiers::NONE));
+
+        assert_eq!(app.config.defaults.view, "View2");
     }
 }
