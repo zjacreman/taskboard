@@ -42,36 +42,50 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
         KeyCode::Char('x') => {
             if let Some(idx) = app.selected_task_index() {
                 app.tasks[idx].status.cycle();
+                match app.tasks[idx].status {
+                    TaskStatus::Done => {
+                        app.tasks[idx].done_date = Some(chrono::Local::now().date_naive());
+                    }
+                    TaskStatus::Todo => {
+                        app.tasks[idx].done_date = None;
+                    }
+                }
+                app.persist_task(idx);
                 app.dirty = true;
             }
         }
         KeyCode::Char('p') => {
             if let Some(idx) = app.selected_task_index() {
                 app.tasks[idx].priority.cycle();
+                app.persist_task(idx);
                 app.dirty = true;
             }
         }
         KeyCode::Char('d') => {
             if let Some(idx) = app.selected_task_index() {
                 app.tasks[idx].due_date = Some(chrono::Local::now().date_naive());
+                app.persist_task(idx);
                 app.dirty = true;
             }
         }
         KeyCode::Char('D') => {
             if let Some(idx) = app.selected_task_index() {
                 app.tasks[idx].due_date = Some(chrono::Local::now().date_naive() + chrono::Duration::days(1));
+                app.persist_task(idx);
                 app.dirty = true;
             }
         }
         KeyCode::Char('s') => {
             if let Some(idx) = app.selected_task_index() {
                 app.tasks[idx].scheduled_date = Some(chrono::Local::now().date_naive());
+                app.persist_task(idx);
                 app.dirty = true;
             }
         }
         KeyCode::Char('S') => {
             if let Some(idx) = app.selected_task_index() {
                 app.tasks[idx].scheduled_date = Some(chrono::Local::now().date_naive() + chrono::Duration::days(1));
+                app.persist_task(idx);
                 app.dirty = true;
             }
         }
@@ -79,12 +93,14 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
             if let Some(idx) = app.selected_task_index() {
                 let date = app.tasks[idx].scheduled_date.unwrap_or_else(|| chrono::Local::now().date_naive());
                 app.tasks[idx].scheduled_date = Some(date + chrono::Duration::days(1));
+                app.persist_task(idx);
                 app.dirty = true;
             }
         }
         KeyCode::Char('r') => {
             if let Some(idx) = app.selected_task_index() {
                 app.tasks[idx].recurrence = None;
+                app.persist_task(idx);
                 app.dirty = true;
             }
         }
@@ -119,6 +135,7 @@ fn start_field_edit(app: &mut App) {
     match app.task_edit_field {
         EditField::Priority => {
             app.tasks[idx].priority.cycle();
+            app.persist_task(idx);
             app.dirty = true;
             return;
         }
@@ -199,6 +216,7 @@ fn apply_field_edit(app: &mut App) {
             }
         }
     }
+    app.persist_task(idx);
     app.dirty = true;
 }
 

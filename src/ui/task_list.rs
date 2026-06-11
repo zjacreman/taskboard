@@ -6,6 +6,7 @@ use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph};
 
 const COMPACT_WIDTH: usize = 80;
 const WIDE_WIDTH: usize = 120;
+const PATH_INDENT: &str = "    ";
 
 pub fn draw(frame: &mut ratatui::Frame, app: &App) {
     let chunks = Layout::default()
@@ -36,8 +37,49 @@ fn format_scheduled_date(date: chrono::NaiveDate, width: usize) -> String {
     }
 }
 
+fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
+    if max_width == 0 || text.len() <= max_width {
+        return vec![text.to_string()];
+    }
+
+    let mut lines = Vec::new();
+    let mut current_line = String::new();
+
+    for word in text.split_whitespace() {
+        if current_line.is_empty() {
+            if word.len() > max_width {
+                for chunk in word.as_bytes().chunks(max_width) {
+                    lines.push(String::from_utf8_lossy(chunk).to_string());
+                }
+            } else {
+                current_line = word.to_string();
+            }
+        } else if current_line.len() + 1 + word.len() > max_width {
+            lines.push(current_line);
+            if word.len() > max_width {
+                for chunk in word.as_bytes().chunks(max_width) {
+                    lines.push(String::from_utf8_lossy(chunk).to_string());
+                }
+                current_line = String::new();
+            } else {
+                current_line = word.to_string();
+            }
+        } else {
+            current_line.push(' ');
+            current_line.push_str(word);
+        }
+    }
+
+    if !current_line.is_empty() {
+        lines.push(current_line);
+    }
+
+    lines
+}
+
 fn draw_task_list(frame: &mut ratatui::Frame, app: &App, area: Rect) {
     let width = area.width as usize;
+    let inner_width = width.saturating_sub(2); // Account for borders
 
     let items: Vec<ListItem> = app
         .filtered_indices
@@ -67,33 +109,83 @@ fn draw_task_list(frame: &mut ratatui::Frame, app: &App, area: Rect) {
                 .map(|d| format_scheduled_date(d, width))
                 .unwrap_or_default();
 
-            let source = if width >= WIDE_WIDTH {
+            let (source, show_path_below) = if width >= WIDE_WIDTH {
                 let rel = app.workspace_path.as_ref()
                     .and_then(|wp| task.source_file.strip_prefix(wp).ok())
                     .unwrap_or(&task.source_file);
-                format!(" {}", rel.display())
+                (format!(" {}", rel.display()), false)
+            } else {
+                (String::new(), true)
+            };
+
+            let path_display = if show_path_below {
+                let rel = app.workspace_path.as_ref()
+                    .and_then(|wp| task.source_file.strip_prefix(wp).ok())
+                    .unwrap_or(&task.source_file);
+                rel.display().to_string()
             } else {
                 String::new()
             };
 
-            let line = if i == app.selected_index {
-                Line::from(vec![
+            let prefix_len = status.len() + 1 + priority_str.len();
+            let metadata_len = due.len() + scheduled.len() + source.len();
+            let desc_max_width = inner_width.saturating_sub(prefix_len + metadata_len).max(20);
+
+            let desc_lines = wrap_text(&task.description, desc_max_width);
+
+            let mut lines: Vec<Line> = Vec::new();
+
+            if i == app.selected_index {
+                let first_desc = desc_lines.first().cloned().unwrap_or_default();
+                let main_line = format!("{} {}{}{}{}{}", status, priority_str, first_desc, due, scheduled, source);
+                lines.push(Line::from(vec![
                     Span::styled(
-                        format!("{} {}{}{}{}{}", status, priority_str, task.description, due, scheduled, source),
+                        main_line,
                         Style::default().fg(Color::Black).bg(Color::White).add_modifier(Modifier::BOLD),
                     ),
-                ])
+                ]));
+                for desc_line in desc_lines.iter().skip(1) {
+                    lines.push(Line::from(vec![
+                        Span::styled(
+                            format!("{}{}", " ".repeat(prefix_len), desc_line),
+                            Style::default().fg(Color::Black).bg(Color::White),
+                        ),
+                    ]));
+                }
+                if show_path_below && !path_display.is_empty() {
+                    lines.push(Line::from(vec![
+                        Span::styled(
+                            format!("{}{}", PATH_INDENT, path_display),
+                            Style::default().fg(Color::Black).bg(Color::White),
+                        ),
+                    ]));
+                }
             } else {
-                Line::from(vec![
+                let first_desc = desc_lines.first().cloned().unwrap_or_default();
+                lines.push(Line::from(vec![
                     Span::styled(status, Style::default().fg(Color::DarkGray)),
                     Span::raw(" "),
                     Span::raw(priority_str),
-                    Span::raw(task.description.clone()),
+                    Span::raw(first_desc),
                     Span::styled(format!("{}{}{}", due, scheduled, source), Style::default().fg(Color::DarkGray)),
-                ])
-            };
+                ]));
+                for desc_line in desc_lines.iter().skip(1) {
+                    lines.push(Line::from(vec![
+                        Span::raw(" ".repeat(prefix_len)),
+                        Span::raw(desc_line.clone()),
+                    ]));
+                }
+                if show_path_below && !path_display.is_empty() {
+                    lines.push(Line::from(vec![
+                        Span::styled(
+                            format!("{}{}", PATH_INDENT, path_display),
+                            Style::default().fg(Color::DarkGray),
+                        ),
+                    ]));
+                }
+            }
 
-            ListItem::new(line)
+            ListItem::new(lines)
         })
         .collect();
 
@@ -119,11 +211,21 @@ fn draw_status_bar(frame: &mut ratatui::Frame, app: &App, area: Rect) {
         .count();
     let open = total - done;
 
-    let status = format!(
-        "{} tasks ({} done, {} open) | {} | q:quit / /:search / ?:help",
-        total, done, open, app.current_view.name
-    );
+    let status = if let Some(msg) = &app.status_message {
+        format!("{} | q:quit / /:search / ?:help", msg)
+    } else {
+        format!(
+            "{} tasks ({} done, {} open) | {} | q:quit / /:search / ?:help",
+            total, done, open, app.current_view.name
+        )
+    };
 
-    let paragraph = Paragraph::new(status).style(Style::default().fg(Color::DarkGray));
+    let style = if app.status_message.is_some() {
+        Style::default().fg(Color::Red)
+    } else {
+        Style::default().fg(Color::DarkGray)
+    };
+
+    let paragraph = Paragraph::new(status).style(style);
     frame.render_widget(paragraph, area);
 }

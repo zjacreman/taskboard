@@ -570,7 +570,7 @@ mod tests {
     #[test]
     fn test_folder_matches_component() {
         let mut tasks = sample_tasks();
-        tasks[2].source_file = std::path::PathBuf::from("bugs/critical.md");
+        tasks[0].source_file = std::path::PathBuf::from("bugs/critical.md");
         let result = execute_query("folder bugs", &tasks).unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].description, "Fix bug");

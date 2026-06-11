@@ -38,6 +38,7 @@ pub struct App {
     pub task_edit_field: TaskEditField,
     pub file_watcher: Option<crate::vault::FileWatcher>,
     pub dirty: bool,
+    pub status_message: Option<String>,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -84,6 +85,7 @@ impl App {
             task_edit_field: TaskEditField::Description,
             file_watcher: None,
             dirty: true,
+            status_message: None,
         }
     }
 
@@ -187,9 +189,33 @@ impl App {
         }
     }
 
+    pub fn persist_task(&mut self, idx: usize) {
+        if let Some(task) = self.tasks.get(idx) {
+            match task.write_to_file() {
+                Ok(()) => {
+                    self.status_message = None;
+                }
+                Err(e) => {
+                    let msg = format!("Failed to save: {}", e);
+                    log::warn!("{}", msg);
+                    self.status_message = Some(msg);
+                }
+            }
+        }
+    }
+
     fn toggle_done(&mut self) {
         if let Some(idx) = self.selected_task_index() {
             self.tasks[idx].status.cycle();
+            match self.tasks[idx].status {
+                crate::task::TaskStatus::Done => {
+                    self.tasks[idx].done_date = Some(chrono::Local::now().date_naive());
+                }
+                crate::task::TaskStatus::Todo => {
+                    self.tasks[idx].done_date = None;
+                }
+            }
+            self.persist_task(idx);
             self.dirty = true;
         }
     }
@@ -197,6 +223,7 @@ impl App {
     fn cycle_priority(&mut self) {
         if let Some(idx) = self.selected_task_index() {
             self.tasks[idx].priority.cycle();
+            self.persist_task(idx);
             self.dirty = true;
         }
     }
@@ -204,6 +231,7 @@ impl App {
     fn set_due_date_today(&mut self) {
         if let Some(idx) = self.selected_task_index() {
             self.tasks[idx].due_date = Some(chrono::Local::now().date_naive());
+            self.persist_task(idx);
             self.dirty = true;
         }
     }
@@ -211,6 +239,7 @@ impl App {
     fn set_due_date_tomorrow(&mut self) {
         if let Some(idx) = self.selected_task_index() {
             self.tasks[idx].due_date = Some(chrono::Local::now().date_naive() + chrono::Duration::days(1));
+            self.persist_task(idx);
             self.dirty = true;
         }
     }
@@ -218,6 +247,7 @@ impl App {
     fn set_scheduled_today(&mut self) {
         if let Some(idx) = self.selected_task_index() {
             self.tasks[idx].scheduled_date = Some(chrono::Local::now().date_naive());
+            self.persist_task(idx);
             self.dirty = true;
         }
     }
@@ -225,6 +255,7 @@ impl App {
     fn set_scheduled_tomorrow(&mut self) {
         if let Some(idx) = self.selected_task_index() {
             self.tasks[idx].scheduled_date = Some(chrono::Local::now().date_naive() + chrono::Duration::days(1));
+            self.persist_task(idx);
             self.dirty = true;
         }
     }
@@ -233,6 +264,7 @@ impl App {
         if let Some(idx) = self.selected_task_index() {
             let date = self.tasks[idx].scheduled_date.unwrap_or_else(|| chrono::Local::now().date_naive());
             self.tasks[idx].scheduled_date = Some(date + chrono::Duration::days(1));
+            self.persist_task(idx);
             self.dirty = true;
         }
     }
@@ -359,13 +391,20 @@ impl App {
             self.current_view.query.clone()
         };
 
-        self.filtered_indices = crate::task::query::execute_query(&query, &self.tasks)
-            .unwrap_or_default()
-            .iter()
-            .map(|t| {
+        let mut result = crate::task::query::execute_query(&query, &self.tasks)
+            .unwrap_or_default();
+
+        // Default sort: by source file path, then by line number
+        result.sort_by(|a, b| {
+            a.source_file.cmp(&b.source_file)
+                .then(a.line_number.cmp(&b.line_number))
+        });
+
+        self.filtered_indices = result.iter()
+            .filter_map(|t| {
                 self.tasks.iter().position(|task| {
                     task.source_file == t.source_file && task.line_number == t.line_number
-                }).unwrap_or(0)
+                })
             })
             .collect();
 
@@ -652,6 +691,7 @@ mod tests {
         let mut app = test_app(tasks, views);
         app.update_filtered_tasks();
 
+        // tasks[0] is "Fix bug" (Todo) — first in sorted order
         assert_eq!(app.tasks[0].status, TaskStatus::Todo);
         app.toggle_done();
         assert_eq!(app.tasks[0].status, TaskStatus::Done);
@@ -666,9 +706,10 @@ mod tests {
         let mut app = test_app(tasks, views);
         app.update_filtered_tasks();
 
-        assert_eq!(app.tasks[0].priority, Priority::None);
+        // tasks[0] is "Fix bug" (priority Medium)
+        assert_eq!(app.tasks[0].priority, Priority::Medium);
         app.cycle_priority();
-        assert_eq!(app.tasks[0].priority, Priority::Highest);
+        assert_eq!(app.tasks[0].priority, Priority::Low);
     }
 
     #[test]
@@ -679,8 +720,9 @@ mod tests {
         app.update_filtered_tasks();
 
         app.selected_index = 2;
+        let idx = app.selected_task_index().unwrap();
         app.set_due_date_today();
-        assert_eq!(app.tasks[2].due_date, Some(chrono::Local::now().date_naive()));
+        assert_eq!(app.tasks[idx].due_date, Some(chrono::Local::now().date_naive()));
     }
 
     #[test]
@@ -690,9 +732,10 @@ mod tests {
         let mut app = test_app(tasks, views);
         app.update_filtered_tasks();
 
+        let idx = app.selected_task_index().unwrap();
         app.set_due_date_tomorrow();
         let tomorrow = chrono::Local::now().date_naive() + chrono::Duration::days(1);
-        assert_eq!(app.tasks[0].due_date, Some(tomorrow));
+        assert_eq!(app.tasks[idx].due_date, Some(tomorrow));
     }
 
     #[test]
@@ -702,8 +745,9 @@ mod tests {
         let mut app = test_app(tasks, views);
         app.update_filtered_tasks();
 
+        let idx = app.selected_task_index().unwrap();
         app.set_scheduled_today();
-        assert_eq!(app.tasks[0].scheduled_date, Some(chrono::Local::now().date_naive()));
+        assert_eq!(app.tasks[idx].scheduled_date, Some(chrono::Local::now().date_naive()));
     }
 
     #[test]
@@ -713,9 +757,10 @@ mod tests {
         let mut app = test_app(tasks, views);
         app.update_filtered_tasks();
 
+        let idx = app.selected_task_index().unwrap();
         app.set_scheduled_tomorrow();
         let tomorrow = chrono::Local::now().date_naive() + chrono::Duration::days(1);
-        assert_eq!(app.tasks[0].scheduled_date, Some(tomorrow));
+        assert_eq!(app.tasks[idx].scheduled_date, Some(tomorrow));
     }
 
     #[test]
@@ -726,9 +771,10 @@ mod tests {
         app.update_filtered_tasks();
 
         app.selected_index = 2;
-        let original = app.tasks[2].scheduled_date.unwrap();
+        let idx = app.selected_task_index().unwrap();
+        let original = app.tasks[idx].scheduled_date.unwrap();
         app.bump_scheduled();
-        assert_eq!(app.tasks[2].scheduled_date, Some(original + chrono::Duration::days(1)));
+        assert_eq!(app.tasks[idx].scheduled_date, Some(original + chrono::Duration::days(1)));
     }
 
     #[test]
@@ -738,10 +784,13 @@ mod tests {
         let mut app = test_app(tasks, views);
         app.update_filtered_tasks();
 
-        app.selected_index = 0;
+        // tasks[1] = "Buy groceries" has no scheduled_date
+        app.selected_index = 1;
+        let idx = app.selected_task_index().unwrap();
+        assert!(app.tasks[idx].scheduled_date.is_none());
         app.bump_scheduled();
         let today = chrono::Local::now().date_naive();
-        assert_eq!(app.tasks[0].scheduled_date, Some(today + chrono::Duration::days(1)));
+        assert_eq!(app.tasks[idx].scheduled_date, Some(today + chrono::Duration::days(1)));
     }
 
     #[test]
@@ -780,17 +829,22 @@ mod tests {
         let mut app = test_app(tasks, views);
         app.update_filtered_tasks();
 
+        let idx = app.selected_task_index().unwrap();
+        assert_eq!(app.tasks[idx].status, TaskStatus::Todo);
         app.toggle_done();
-        assert_eq!(app.tasks[0].status, TaskStatus::Done);
+        assert_eq!(app.tasks[idx].status, TaskStatus::Done);
 
         app.update_filtered_tasks();
-        assert_eq!(app.tasks[0].status, TaskStatus::Done);
+        let idx = app.selected_task_index().unwrap();
+        assert_eq!(app.tasks[idx].status, TaskStatus::Done);
 
+        assert_eq!(app.tasks[idx].priority, Priority::Medium);
         app.cycle_priority();
-        assert_eq!(app.tasks[0].priority, Priority::Highest);
+        assert_eq!(app.tasks[idx].priority, Priority::Low);
 
         app.update_filtered_tasks();
-        assert_eq!(app.tasks[0].priority, Priority::Highest);
+        let idx = app.selected_task_index().unwrap();
+        assert_eq!(app.tasks[idx].priority, Priority::Low);
     }
 
     #[test]
@@ -919,13 +973,16 @@ mod tests {
         app.update_filtered_tasks();
         app.show_modal = true;
 
+        let idx = app.selected_task_index().unwrap();
+        let original_desc = app.tasks[idx].description.clone();
+
         // Start editing description
         app.handle_key(key_event(KeyCode::Char('e'), KeyModifiers::NONE));
         assert!(app.task_edit.is_some());
-        assert_eq!(app.task_edit.as_ref().unwrap().lines()[0], "Buy groceries");
+        assert_eq!(app.task_edit.as_ref().unwrap().lines()[0], original_desc);
 
         // Clear the field
-        for _ in 0..13 {
+        for _ in 0..original_desc.len() {
             app.handle_key(key_event(KeyCode::Backspace, KeyModifiers::NONE));
         }
         assert_eq!(app.task_edit.as_ref().unwrap().lines()[0], "");
@@ -938,7 +995,7 @@ mod tests {
         // Save
         app.handle_key(key_event(KeyCode::Enter, KeyModifiers::NONE));
         assert!(app.task_edit.is_none());
-        assert_eq!(app.tasks[0].description, "Cook");
+        assert_eq!(app.tasks[idx].description, "Cook");
     }
 
     #[test]
@@ -949,6 +1006,9 @@ mod tests {
         app.update_filtered_tasks();
         app.show_modal = true;
 
+        let idx = app.selected_task_index().unwrap();
+        let original_desc = app.tasks[idx].description.clone();
+
         // Start editing description
         app.handle_key(key_event(KeyCode::Char('e'), KeyModifiers::NONE));
         assert!(app.task_edit.is_some());
@@ -956,7 +1016,7 @@ mod tests {
         // Cancel
         app.handle_key(key_event(KeyCode::Esc, KeyModifiers::NONE));
         assert!(app.task_edit.is_none());
-        assert_eq!(app.tasks[0].description, "Buy groceries"); // unchanged
+        assert_eq!(app.tasks[idx].description, original_desc); // unchanged
     }
 
     #[test]
@@ -967,25 +1027,40 @@ mod tests {
         app.update_filtered_tasks();
         app.show_modal = true;
 
+        let idx = app.selected_task_index().unwrap();
+        let original_status = app.tasks[idx].status;
+        let status_text = match original_status {
+            TaskStatus::Todo => "todo",
+            TaskStatus::Done => "done",
+        };
+
         // Navigate to status field
         app.handle_key(key_event(KeyCode::Tab, KeyModifiers::NONE));
         assert_eq!(app.task_edit_field, EditField::Status);
 
         // Start editing
         app.handle_key(key_event(KeyCode::Char('e'), KeyModifiers::NONE));
-        assert_eq!(app.task_edit.as_ref().unwrap().lines()[0], "todo");
+        assert_eq!(app.task_edit.as_ref().unwrap().lines()[0], status_text);
 
-        // Clear and type "done"
-        for _ in 0..4 {
+        // Clear and type opposite status
+        let opposite = match original_status {
+            TaskStatus::Todo => "done",
+            TaskStatus::Done => "todo",
+        };
+        for _ in 0..status_text.len() {
             app.handle_key(key_event(KeyCode::Backspace, KeyModifiers::NONE));
         }
-        for c in "done".chars() {
+        for c in opposite.chars() {
             app.handle_key(key_event(KeyCode::Char(c), KeyModifiers::NONE));
         }
 
         // Save
         app.handle_key(key_event(KeyCode::Enter, KeyModifiers::NONE));
-        assert_eq!(app.tasks[0].status, TaskStatus::Done);
+        let expected = match original_status {
+            TaskStatus::Todo => TaskStatus::Done,
+            TaskStatus::Done => TaskStatus::Todo,
+        };
+        assert_eq!(app.tasks[idx].status, expected);
     }
 
     #[test]
@@ -996,15 +1071,18 @@ mod tests {
         app.update_filtered_tasks();
         app.show_modal = true;
 
+        let idx = app.selected_task_index().unwrap();
+        let original_priority = app.tasks[idx].priority;
+
         // Navigate to priority field
         app.handle_key(key_event(KeyCode::Tab, KeyModifiers::NONE));
         app.handle_key(key_event(KeyCode::Tab, KeyModifiers::NONE));
         assert_eq!(app.task_edit_field, EditField::Priority);
 
         // Press 'e' to cycle priority (picker, not text editor)
-        assert_eq!(app.tasks[0].priority, Priority::None);
         app.handle_key(key_event(KeyCode::Char('e'), KeyModifiers::NONE));
-        assert_eq!(app.tasks[0].priority, Priority::Highest);
+        // Priority should have cycled from original
+        assert_ne!(app.tasks[idx].priority, original_priority);
         // Should not have opened a text editor
         assert!(app.task_edit.is_none());
     }
@@ -1017,18 +1095,25 @@ mod tests {
         app.update_filtered_tasks();
         app.show_modal = true;
 
+        let idx = app.selected_task_index().unwrap();
+        let original_due = app.tasks[idx].due_date;
+
         // Navigate to due date field
         app.handle_key(key_event(KeyCode::Tab, KeyModifiers::NONE));
         app.handle_key(key_event(KeyCode::Tab, KeyModifiers::NONE));
         app.handle_key(key_event(KeyCode::Tab, KeyModifiers::NONE));
         assert_eq!(app.task_edit_field, EditField::DueDate);
 
-        // Start editing - task[0] has due_date 2026-06-15
+        // Start editing
         app.handle_key(key_event(KeyCode::Char('e'), KeyModifiers::NONE));
-        assert_eq!(app.task_edit.as_ref().unwrap().lines()[0], "2026-06-15");
+        let edit_text = app.task_edit.as_ref().unwrap().lines()[0].clone();
+        let expected_edit = original_due
+            .map(|d| d.format("%Y-%m-%d").to_string())
+            .unwrap_or_default();
+        assert_eq!(edit_text, expected_edit);
 
         // Clear and type "tomorrow"
-        for _ in 0..10 {
+        for _ in 0..edit_text.len() {
             app.handle_key(key_event(KeyCode::Backspace, KeyModifiers::NONE));
         }
         for c in "tomorrow".chars() {
@@ -1038,7 +1123,7 @@ mod tests {
         // Save
         app.handle_key(key_event(KeyCode::Enter, KeyModifiers::NONE));
         let tomorrow = chrono::Local::now().date_naive() + chrono::Duration::days(1);
-        assert_eq!(app.tasks[0].due_date, Some(tomorrow));
+        assert_eq!(app.tasks[idx].due_date, Some(tomorrow));
     }
 
     #[test]
@@ -1048,6 +1133,8 @@ mod tests {
         let mut app = test_app(tasks, views);
         app.update_filtered_tasks();
         app.show_modal = true;
+
+        let idx = app.selected_task_index().unwrap();
 
         // Navigate to due date field
         app.handle_key(key_event(KeyCode::Tab, KeyModifiers::NONE));
@@ -1065,7 +1152,7 @@ mod tests {
 
         // Save
         app.handle_key(key_event(KeyCode::Enter, KeyModifiers::NONE));
-        assert_eq!(app.tasks[0].due_date, None);
+        assert_eq!(app.tasks[idx].due_date, None);
     }
 
     #[test]
@@ -1076,24 +1163,34 @@ mod tests {
         app.update_filtered_tasks();
         app.show_modal = true;
 
+        let idx = app.selected_task_index().unwrap();
+        let original_recurrence = app.tasks[idx].recurrence.clone();
+
         // Navigate to recurrence field
         for _ in 0..5 {
             app.handle_key(key_event(KeyCode::Tab, KeyModifiers::NONE));
         }
         assert_eq!(app.task_edit_field, EditField::Recurrence);
 
-        // Start editing - task[0] has no recurrence
+        // Start editing
         app.handle_key(key_event(KeyCode::Char('e'), KeyModifiers::NONE));
-        assert_eq!(app.task_edit.as_ref().unwrap().lines()[0], "");
+        assert_eq!(
+            app.task_edit.as_ref().unwrap().lines()[0],
+            original_recurrence.as_deref().unwrap_or("")
+        );
 
-        // Type "every month"
+        // Clear and type "every month"
+        let clear_len = original_recurrence.as_ref().map(|s| s.len()).unwrap_or(0);
+        for _ in 0..clear_len {
+            app.handle_key(key_event(KeyCode::Backspace, KeyModifiers::NONE));
+        }
         for c in "every month".chars() {
             app.handle_key(key_event(KeyCode::Char(c), KeyModifiers::NONE));
         }
 
         // Save
         app.handle_key(key_event(KeyCode::Enter, KeyModifiers::NONE));
-        assert_eq!(app.tasks[0].recurrence, Some("every month".to_string()));
+        assert_eq!(app.tasks[idx].recurrence, Some("every month".to_string()));
     }
 
     #[test]
@@ -1104,7 +1201,10 @@ mod tests {
         app.update_filtered_tasks();
         app.show_modal = true;
 
-        // Start editing description ("Buy groceries")
+        let idx = app.selected_task_index().unwrap();
+        let original_desc = app.tasks[idx].description.clone();
+
+        // Start editing description
         app.handle_key(key_event(KeyCode::Char('e'), KeyModifiers::NONE));
         assert!(app.task_edit.is_some());
 
@@ -1115,13 +1215,14 @@ mod tests {
         // Insert 'x' at cursor position
         app.handle_key(key_event(KeyCode::Char('x'), KeyModifiers::NONE));
 
-        // Verify text is "Buy groceriexs"
+        // Verify text has 'x' inserted two chars from end
         let text = &app.task_edit.as_ref().unwrap().lines()[0];
-        assert_eq!(text, "Buy groceriexs");
+        let expected = format!("{}x{}", &original_desc[..original_desc.len()-2], &original_desc[original_desc.len()-2..]);
+        assert_eq!(text, &expected);
 
         // Save
         app.handle_key(key_event(KeyCode::Enter, KeyModifiers::NONE));
-        assert_eq!(app.tasks[0].description, "Buy groceriexs");
+        assert_eq!(app.tasks[idx].description, expected);
     }
 
     #[test]
@@ -1131,6 +1232,9 @@ mod tests {
         let mut app = test_app(tasks, views);
         app.update_filtered_tasks();
         app.show_modal = true;
+
+        let idx = app.selected_task_index().unwrap();
+        let original_desc = app.tasks[idx].description.clone();
 
         // Start editing description
         app.handle_key(key_event(KeyCode::Char('e'), KeyModifiers::NONE));
@@ -1143,7 +1247,7 @@ mod tests {
 
         // Verify
         let text = &app.task_edit.as_ref().unwrap().lines()[0];
-        assert_eq!(text, "!Buy groceries");
+        assert_eq!(text, &format!("!{}", original_desc));
     }
 
     #[test]
@@ -1163,5 +1267,147 @@ mod tests {
 
         assert!(app.search_textarea.is_none());
         assert_eq!(app.current_view.query, "done");
+    }
+
+    #[test]
+    fn test_toggle_done_persists_to_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let file_path = dir.path().join("persist_test.md");
+        std::fs::write(&file_path, "# Tasks\n- [ ] Buy groceries\n- [x] Review PR\n").unwrap();
+
+        let tasks = vec![
+            Task {
+                description: "Buy groceries".to_string(),
+                status: TaskStatus::Todo,
+                priority: Priority::None,
+                due_date: None,
+                scheduled_date: None,
+                recurrence: None,
+                done_date: None,
+                start_date: None,
+                tags: vec![],
+                source_file: file_path.clone(),
+                line_number: 2,
+            },
+            Task {
+                description: "Review PR".to_string(),
+                status: TaskStatus::Done,
+                priority: Priority::None,
+                due_date: None,
+                scheduled_date: None,
+                recurrence: None,
+                done_date: Some(chrono::NaiveDate::from_ymd_opt(2026, 6, 10).unwrap()),
+                start_date: None,
+                tags: vec![],
+                source_file: file_path.clone(),
+                line_number: 3,
+            },
+        ];
+
+        let views = sample_views();
+        let mut app = test_app(tasks, views);
+        app.update_filtered_tasks();
+
+        // Toggle first task to done
+        app.toggle_done();
+        assert_eq!(app.tasks[0].status, TaskStatus::Done);
+
+        // Verify file was updated
+        let content = std::fs::read_to_string(&file_path).unwrap();
+        assert!(content.contains("- [x] Buy groceries"), "File should contain done task, got: {}", content);
+        assert!(content.contains("✅"), "File should contain done date emoji, got: {}", content);
+    }
+
+    #[test]
+    fn test_toggle_done_then_rescan() {
+        let dir = tempfile::tempdir().unwrap();
+        let file_path = dir.path().join("rescan_test.md");
+        std::fs::write(&file_path, "# Tasks\n- [ ] Buy groceries\n").unwrap();
+
+        let tasks = vec![
+            Task {
+                description: "Buy groceries".to_string(),
+                status: TaskStatus::Todo,
+                priority: Priority::None,
+                due_date: None,
+                scheduled_date: None,
+                recurrence: None,
+                done_date: None,
+                start_date: None,
+                tags: vec![],
+                source_file: file_path.clone(),
+                line_number: 2,
+            },
+        ];
+
+        let views = sample_views();
+        let mut app = test_app(tasks, views);
+        app.update_filtered_tasks();
+
+        // Toggle to done
+        app.toggle_done();
+        assert_eq!(app.tasks[0].status, TaskStatus::Done);
+
+        // Simulate rescan (re-read from disk)
+        let content = std::fs::read_to_string(&file_path).unwrap();
+        let reparsed = crate::task::parser::parse_file(&content, &file_path);
+        assert_eq!(reparsed.len(), 1);
+        assert_eq!(reparsed[0].status, TaskStatus::Done, "Rescanned task should be done");
+    }
+
+    #[test]
+    fn test_sorted_by_path_then_line() {
+        let tasks = vec![
+            Task {
+                description: "Zebra task".to_string(),
+                status: TaskStatus::Todo,
+                priority: Priority::None,
+                due_date: None,
+                scheduled_date: None,
+                recurrence: None,
+                done_date: None,
+                start_date: None,
+                tags: vec![],
+                source_file: PathBuf::from("b.md"),
+                line_number: 1,
+            },
+            Task {
+                description: "Alpha task".to_string(),
+                status: TaskStatus::Todo,
+                priority: Priority::None,
+                due_date: None,
+                scheduled_date: None,
+                recurrence: None,
+                done_date: None,
+                start_date: None,
+                tags: vec![],
+                source_file: PathBuf::from("a.md"),
+                line_number: 1,
+            },
+            Task {
+                description: "Another task".to_string(),
+                status: TaskStatus::Todo,
+                priority: Priority::None,
+                due_date: None,
+                scheduled_date: None,
+                recurrence: None,
+                done_date: None,
+                start_date: None,
+                tags: vec![],
+                source_file: PathBuf::from("a.md"),
+                line_number: 2,
+            },
+        ];
+
+        let views = sample_views();
+        let mut app = test_app(tasks, views);
+        app.update_filtered_tasks();
+
+        // Should be sorted by path then line number
+        assert_eq!(app.tasks[app.filtered_indices[0]].source_file, PathBuf::from("a.md"));
+        assert_eq!(app.tasks[app.filtered_indices[0]].line_number, 1);
+        assert_eq!(app.tasks[app.filtered_indices[1]].source_file, PathBuf::from("a.md"));
+        assert_eq!(app.tasks[app.filtered_indices[1]].line_number, 2);
+        assert_eq!(app.tasks[app.filtered_indices[2]].source_file, PathBuf::from("b.md"));
     }
 }

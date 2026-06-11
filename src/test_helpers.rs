@@ -9,6 +9,19 @@ use std::path::PathBuf;
 pub fn sample_tasks() -> Vec<Task> {
     vec![
         Task {
+            description: "Fix bug".to_string(),
+            status: TaskStatus::Todo,
+            priority: Priority::Medium,
+            due_date: None,
+            scheduled_date: Some(NaiveDate::from_ymd_opt(2026, 6, 12).unwrap()),
+            recurrence: Some("every week".to_string()),
+            done_date: None,
+            start_date: None,
+            tags: vec!["work".to_string(), "urgent".to_string()],
+            source_file: PathBuf::from("bugs.md"),
+            line_number: 10,
+        },
+        Task {
             description: "Buy groceries".to_string(),
             status: TaskStatus::Todo,
             priority: Priority::None,
@@ -33,19 +46,6 @@ pub fn sample_tasks() -> Vec<Task> {
             tags: vec!["work".to_string()],
             source_file: PathBuf::from("work.md"),
             line_number: 5,
-        },
-        Task {
-            description: "Fix bug".to_string(),
-            status: TaskStatus::Todo,
-            priority: Priority::Medium,
-            due_date: None,
-            scheduled_date: Some(NaiveDate::from_ymd_opt(2026, 6, 12).unwrap()),
-            recurrence: Some("every week".to_string()),
-            done_date: None,
-            start_date: None,
-            tags: vec!["work".to_string(), "urgent".to_string()],
-            source_file: PathBuf::from("bugs.md"),
-            line_number: 10,
         },
     ]
 }
