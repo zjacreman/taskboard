@@ -163,11 +163,11 @@ fn draw_task_list(frame: &mut ratatui::Frame, app: &App, area: Rect) {
             } else {
                 let first_desc = desc_lines.first().cloned().unwrap_or_default();
                 lines.push(Line::from(vec![
-                    Span::styled(status, Style::default().fg(Color::DarkGray)),
+                    Span::styled(status, Style::default().fg(Color::Yellow)),
                     Span::raw(" "),
                     Span::raw(priority_str),
                     Span::raw(first_desc),
-                    Span::styled(format!("{}{}{}", due, scheduled, source), Style::default().fg(Color::DarkGray)),
+                    Span::styled(format!("{}{}{}", due, scheduled, source), Style::default().fg(Color::Yellow)),
                 ]));
                 for desc_line in desc_lines.iter().skip(1) {
                     lines.push(Line::from(vec![
@@ -179,7 +179,7 @@ fn draw_task_list(frame: &mut ratatui::Frame, app: &App, area: Rect) {
                     lines.push(Line::from(vec![
                         Span::styled(
                             format!("{}{}", PATH_INDENT, path_display),
-                            Style::default().fg(Color::DarkGray),
+                            Style::default().fg(Color::Yellow),
                         ),
                     ]));
                 }
@@ -223,7 +223,7 @@ fn draw_status_bar(frame: &mut ratatui::Frame, app: &App, area: Rect) {
     let style = if app.status_message.is_some() {
         Style::default().fg(Color::Red)
     } else {
-        Style::default().fg(Color::DarkGray)
+        Style::default().fg(Color::Yellow)
     };
 
     let paragraph = Paragraph::new(status).style(style);
