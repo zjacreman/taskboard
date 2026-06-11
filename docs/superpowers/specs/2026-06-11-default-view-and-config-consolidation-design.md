@@ -64,7 +64,7 @@ Press `s` in the view manager to set the selected view as the default. This upda
 Before: `Enter: switch | e: edit | d: del | Esc: close`
 After: `Enter: switch | e: edit | d: del | s: set default | Esc: close`
 
-**Visual indicator:** The default view gets a `* ` prefix (same as the current active view indicator) or a `[default]` suffix in the list.
+**Visual indicator:** The default view gets a `(default)` suffix after its name in the list. This is distinct from the `* ` prefix used for the currently active view. Example: `  Overdue (default)` vs `* Overdue`.
 
 ### 4. Config save support
 
