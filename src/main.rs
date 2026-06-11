@@ -59,6 +59,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 },
                 defaults: config::DefaultsConfig::default(),
                 theme: config::ThemeConfig::default(),
+                views: vec![],
             };
 
             // Save config for next run

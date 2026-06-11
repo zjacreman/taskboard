@@ -605,6 +605,7 @@ mod tests {
             workspace: WorkspaceConfig { path: PathBuf::from(".") },
             defaults: DefaultsConfig::default(),
             theme: ThemeConfig::default(),
+            views: vec![],
         }
     }
 
