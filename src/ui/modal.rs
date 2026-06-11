@@ -5,7 +5,7 @@ use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph};
-use tui_textarea::TextArea;
+use tui_textarea::{TextArea, CursorMove};
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum EditField {
@@ -158,6 +158,7 @@ fn start_field_edit(app: &mut App) {
     };
     let mut textarea = TextArea::new(vec![text]);
     textarea.set_cursor_line_style(ratatui::style::Style::default());
+    textarea.move_cursor(CursorMove::End);
     app.task_edit = Some(textarea);
 }
 
