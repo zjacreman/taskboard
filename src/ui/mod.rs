@@ -516,12 +516,13 @@ fn draw_view_manager(frame: &mut ratatui::Frame, app: &App) {
                     Style::default().fg(Color::White)
                 };
                 let prefix = if v.name == app.current_view.name { "* " } else { "  " };
-                ListItem::new(Line::from(format!("{}{}", prefix, v.name))).style(style)
+                let suffix = if v.name == app.config.defaults.view { " (default)" } else { "" };
+                ListItem::new(Line::from(format!("{}{}{}", prefix, v.name, suffix))).style(style)
             })
             .collect();
 
         let help_line = Line::from(Span::styled(
-            "Enter: switch | e: edit | d: del | Esc: close",
+            "Enter: switch | e: edit | d: del | s: set default | Esc: close",
             Style::default().fg(Color::Gray),
         ));
 
