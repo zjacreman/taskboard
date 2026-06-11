@@ -40,6 +40,17 @@ pub struct ViewConfig {
     pub group_by: String,
 }
 
+impl Default for ViewConfig {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            query: String::new(),
+            sort_by: default_sort_by(),
+            group_by: String::new(),
+        }
+    }
+}
+
 fn default_sort_by() -> String {
     "due_date".to_string()
 }
