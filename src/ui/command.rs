@@ -8,6 +8,10 @@ use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 use tui_textarea::TextArea;
 
 pub fn handle_key(app: &mut App, key: KeyEvent) {
+    if app.save_view_confirm_overwrite.is_some() {
+        handle_overwrite_confirm_key(app, key);
+        return;
+    }
     if app.save_view_edit.is_some() {
         handle_save_view_key(app, key);
         return;
@@ -47,6 +51,12 @@ fn handle_save_view_key(app: &mut App, key: KeyEvent) {
                 textarea.lines()[0].clone()
             };
 
+            // Check if view with this name already exists
+            if let Some(idx) = app.views.iter().position(|v| v.name == name) {
+                app.save_view_confirm_overwrite = Some(idx);
+                return;
+            }
+
             let view = View::new(
                 &name,
                 &app.current_view.query,
@@ -64,6 +74,30 @@ fn handle_save_view_key(app: &mut App, key: KeyEvent) {
         _ => {
             textarea.input(key);
         }
+    }
+}
+
+fn handle_overwrite_confirm_key(app: &mut App, key: KeyEvent) {
+    match key.code {
+        KeyCode::Char('y') | KeyCode::Char('Y') => {
+            let idx = app.save_view_confirm_overwrite.unwrap();
+            let name = app.views[idx].name.clone();
+            app.views[idx] = View::new(
+                &name,
+                &app.current_view.query,
+                &app.current_view.sort_by,
+                &app.current_view.group_by,
+            );
+            app.save_views();
+            app.save_view_confirm_overwrite = None;
+            app.save_view_edit = None;
+            app.search_textarea = None;
+            app.dirty = true;
+        }
+        KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+            app.save_view_confirm_overwrite = None;
+        }
+        _ => {}
     }
 }
 
@@ -139,6 +173,10 @@ pub fn draw(frame: &mut ratatui::Frame, app: &App) {
 }
 
 fn draw_save_view(frame: &mut ratatui::Frame, app: &App) {
+    if let Some(idx) = app.save_view_confirm_overwrite {
+        draw_overwrite_confirm(frame, app, idx);
+        return;
+    }
     let Some(textarea) = &app.save_view_edit else { return };
 
     let area = frame.area();
@@ -187,4 +225,45 @@ fn draw_save_view(frame: &mut ratatui::Frame, app: &App) {
         Style::default().fg(Color::Gray),
     ));
     frame.render_widget(help, chunks[4]);
+}
+
+fn draw_overwrite_confirm(frame: &mut ratatui::Frame, app: &App, idx: usize) {
+    let area = frame.area();
+    let popup_width = 50.min(area.width - 4);
+    let popup_height = 6.min(area.height - 4);
+    let x = (area.width - popup_width) / 2;
+    let y = (area.height - popup_height) / 2;
+    let popup_area = Rect::new(x, y, popup_width, popup_height);
+
+    frame.render_widget(Clear, popup_area);
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title("Overwrite View")
+        .style(Style::default().bg(Color::DarkGray));
+    frame.render_widget(block, popup_area);
+
+    let inner = popup_area.inner(ratatui::layout::Margin { horizontal: 1, vertical: 1 });
+    let chunks = ratatui::layout::Layout::default()
+        .direction(ratatui::layout::Direction::Vertical)
+        .constraints([
+            ratatui::layout::Constraint::Length(1),
+            ratatui::layout::Constraint::Length(1),
+            ratatui::layout::Constraint::Length(1),
+            ratatui::layout::Constraint::Length(1),
+        ])
+        .split(inner);
+
+    let name = &app.views[idx].name;
+    let msg = Paragraph::new(Span::styled(
+        format!("View '{}' already exists.", name),
+        Style::default().fg(Color::Yellow),
+    ));
+    frame.render_widget(msg, chunks[0]);
+
+    let prompt = Paragraph::new(Span::styled(
+        "Overwrite? (y/n)",
+        Style::default().fg(Color::Gray),
+    ));
+    frame.render_widget(prompt, chunks[2]);
 }
