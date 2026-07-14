@@ -300,10 +300,10 @@ git commit -m "feat: add Task, TaskStatus, and Priority types"
 # Full Metadata Tasks
 
 - [ ] Task with due date 📅 2026-06-15
-- [ ] Task with scheduled date 🛫 2026-06-12
+- [ ] Task with scheduled date ⏳ 2026-06-12
 - [ ] Task with recurrence 🔁 every week
 - [ ] Task with priority ⏫
-- [ ] Task with all fields 📅 2026-06-15 🛫 2026-06-12 🔁 every week ⏫
+- [ ] Task with all fields 📅 2026-06-15 ⏳ 2026-06-12 🔁 every week ⏫
 - [x] Done task with done date ✅ 2026-06-10
 - [ ] Task with tags #work #urgent
 ```
@@ -474,7 +474,7 @@ fn parse_line(line: &str, line_number: usize, source_file: &PathBuf) -> Option<T
             '🛫' => {
                 description.push_str(current_word.trim());
                 current_word.clear();
-                scheduled_date = parse_date_from_iter(&mut chars);
+                start_date = parse_date_from_iter(&mut chars);
             }
             '🔁' => {
                 description.push_str(current_word.trim());
@@ -489,7 +489,7 @@ fn parse_line(line: &str, line_number: usize, source_file: &PathBuf) -> Option<T
             '⏳' => {
                 description.push_str(current_word.trim());
                 current_word.clear();
-                start_date = parse_date_from_iter(&mut chars);
+                scheduled_date = parse_date_from_iter(&mut chars);
             }
             '⏫' | '🔼' | '🔽' | '⏬' => {
                 description.push_str(current_word.trim());
@@ -1782,9 +1782,9 @@ fn draw_task_list(frame: &mut ratatui::Frame, app: &App, area: Rect) {
                 .scheduled_date
                 .map(|d| {
                     if width < 80 {
-                        format!(" 🛫{}", d.format("%m-%d"))
+                        format!(" ⏳{}", d.format("%m-%d"))
                     } else {
-                        format!(" 🛫 {}", d.format("%Y-%m-%d"))
+                        format!(" ⏳ {}", d.format("%Y-%m-%d"))
                     }
                 })
                 .unwrap_or_default();

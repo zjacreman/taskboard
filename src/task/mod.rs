@@ -99,11 +99,11 @@ impl Task {
         }
 
         if let Some(scheduled) = self.scheduled_date {
-            parts.push(format!("🛫 {}", scheduled.format("%Y-%m-%d")));
+            parts.push(format!("⏳ {}", scheduled.format("%Y-%m-%d")));
         }
 
         if let Some(start) = self.start_date {
-            parts.push(format!("⏳ {}", start.format("%Y-%m-%d")));
+            parts.push(format!("🛫 {}", start.format("%Y-%m-%d")));
         }
 
         if let Some(ref recurrence) = self.recurrence {
@@ -243,7 +243,7 @@ mod tests {
         };
         assert_eq!(
             task.to_markdown(),
-            "- [x] Full task ⏫ 📅 2026-06-15 🛫 2026-06-12 ⏳ 2026-06-10 🔁 every week ✅ 2026-06-14 #work #urgent"
+            "- [x] Full task ⏫ 📅 2026-06-15 ⏳ 2026-06-12 🛫 2026-06-10 🔁 every week ✅ 2026-06-14 #work #urgent"
         );
     }
 

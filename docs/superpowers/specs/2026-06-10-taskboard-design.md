@@ -73,7 +73,7 @@ taskboard/
    - Filter: `*.md` files only
    - Parallel read with rayon (~200ms for 1000 files)
 2. **Parsing:** Line-by-line scan for `- [ ]` or `- [x]` pattern
-   - Extract: status, description, emoji metadata (📅 due, 🛫 scheduled, 🔁 recurrence, ⏫ priority)
+   - Extract: status, description, emoji metadata (📅 due, ⏳ scheduled, 🛫 start, 🔁 recurrence, ⏫ priority)
    - Preserve: source file path, line number
 3. **In-memory store:** All tasks loaded at startup
    - Query engine operates on this

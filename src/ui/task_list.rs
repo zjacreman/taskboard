@@ -31,9 +31,9 @@ fn format_due_date(date: chrono::NaiveDate, width: usize) -> String {
 
 fn format_scheduled_date(date: chrono::NaiveDate, width: usize) -> String {
     if width < COMPACT_WIDTH {
-        format!(" 🛫{}", date.format("%m-%d"))
+        format!(" ⏳{}", date.format("%m-%d"))
     } else {
-        format!(" 🛫 {}", date.format("%Y-%m-%d"))
+        format!(" ⏳ {}", date.format("%Y-%m-%d"))
     }
 }
 
