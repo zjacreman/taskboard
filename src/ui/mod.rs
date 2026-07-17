@@ -485,15 +485,13 @@ fn draw_view_manager(frame: &mut ratatui::Frame, app: &App) {
 
     frame.render_widget(Clear, popup_area);
 
-    if app.view_edit.is_some() {
+    if let Some(textarea) = &app.view_edit {
         let field_name = match app.editing_view_field {
             ViewEditField::Name => "Name",
             ViewEditField::Query => "Query",
             ViewEditField::SortBy => "Sort By",
             ViewEditField::GroupBy => "Group By",
         };
-
-        let textarea = app.view_edit.as_ref().unwrap();
 
         let block = Block::default()
             .borders(Borders::ALL)

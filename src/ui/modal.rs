@@ -138,14 +138,11 @@ fn start_field_edit(app: &mut App) {
     let Some(idx) = app.selected_task_index() else {
         return;
     };
-    match app.task_edit_field {
-        EditField::Priority => {
-            app.tasks[idx].priority.cycle();
-            app.persist_task(idx);
-            app.dirty = true;
-            return;
-        }
-        _ => {}
+    if app.task_edit_field == EditField::Priority {
+        app.tasks[idx].priority.cycle();
+        app.persist_task(idx);
+        app.dirty = true;
+        return;
     }
     let text = match app.task_edit_field {
         EditField::Description => app.tasks[idx].description.clone(),
