@@ -1,4 +1,6 @@
 use crate::task::Task;
+use crate::ui::App;
+use crossterm::event::{KeyCode, KeyEvent};
 
 /// Returns true if the task matches the given filter text: case-insensitive
 /// substring match on the description and on tags. A leading '#' in the
@@ -15,6 +17,29 @@ pub fn matches_filter(task: &Task, filter: &str) -> bool {
     task.tags
         .iter()
         .any(|t| t.to_lowercase().contains(tag_needle))
+}
+
+pub fn handle_key(app: &mut App, key: KeyEvent) {
+    if app.filter_textarea.is_none() {
+        return;
+    }
+    match key.code {
+        KeyCode::Esc => {
+            app.filter_textarea = None;
+            app.filter_text.clear();
+            app.dirty = true;
+        }
+        KeyCode::Enter => {
+            app.filter_textarea = None;
+        }
+        _ => {
+            if let Some(textarea) = &mut app.filter_textarea {
+                textarea.input(key);
+                app.filter_text = textarea.lines().join("\n");
+                app.dirty = true;
+            }
+        }
+    }
 }
 
 #[cfg(test)]

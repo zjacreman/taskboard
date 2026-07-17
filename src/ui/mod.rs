@@ -11,7 +11,7 @@ use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
 use std::io;
 use std::time::Duration;
-use tui_textarea::TextArea;
+use tui_textarea::{CursorMove, TextArea};
 
 use crate::ui::modal::EditField as TaskEditField;
 use ratatui::widgets::ListState;
@@ -41,8 +41,6 @@ pub struct App {
     pub dirty: bool,
     pub status_message: Option<String>,
     pub filter_text: String,
-    // TODO: remove allow(dead_code) once the filter input UI is wired up (Task 3).
-    #[allow(dead_code)]
     pub filter_textarea: Option<TextArea<'static>>,
 }
 
@@ -151,6 +149,10 @@ impl App {
             modal::handle_key(self, key);
             return;
         }
+        if self.filter_textarea.is_some() {
+            filter::handle_key(self, key);
+            return;
+        }
         if self.search_textarea.is_some() {
             command::handle_key(self, key);
             return;
@@ -176,7 +178,11 @@ impl App {
             KeyCode::Char('s') => self.set_scheduled_today(),
             KeyCode::Char('S') => self.set_scheduled_tomorrow(),
             KeyCode::Char('b') => self.bump_scheduled(),
-            KeyCode::Char('/') => self.start_search(),
+            KeyCode::Char('/') => self.start_filter(),
+            KeyCode::Esc if !self.filter_text.is_empty() => {
+                self.filter_text.clear();
+                self.dirty = true;
+            }
             KeyCode::Char('v') => self.show_view_manager = true,
             KeyCode::Enter => self.open_modal(),
             KeyCode::Char('r') => self.rescan_vault(),
@@ -288,16 +294,11 @@ impl App {
         }
     }
 
-    fn start_search(&mut self) {
-        let mut textarea = TextArea::new(
-            self.current_view
-                .query
-                .lines()
-                .map(|l| l.to_string())
-                .collect(),
-        );
+    fn start_filter(&mut self) {
+        let mut textarea = TextArea::new(vec![self.filter_text.clone()]);
         textarea.set_cursor_line_style(ratatui::style::Style::default());
-        self.search_textarea = Some(textarea);
+        textarea.move_cursor(CursorMove::End);
+        self.filter_textarea = Some(textarea);
     }
 
     fn open_modal(&mut self) {
@@ -403,6 +404,7 @@ impl App {
                     if let Some(view) = self.views.get(idx) {
                         self.current_view = view.clone();
                         self.show_view_manager = false;
+                        self.filter_text.clear();
                         self.dirty = true;
                     }
                 }
@@ -1365,25 +1367,6 @@ mod tests {
     }
 
     #[test]
-    fn test_search_alt_enter_submit() {
-        let tasks = sample_tasks();
-        let views = sample_views();
-        let mut app = test_app(tasks, views);
-        app.start_search();
-
-        // Type a query
-        for c in "done".chars() {
-            app.handle_key(key_event(KeyCode::Char(c), KeyModifiers::NONE));
-        }
-
-        // Submit with Alt+Enter
-        app.handle_key(key_event(KeyCode::Enter, KeyModifiers::ALT));
-
-        assert!(app.search_textarea.is_none());
-        assert_eq!(app.current_view.query, "done");
-    }
-
-    #[test]
     fn test_toggle_done_persists_to_file() {
         let dir = tempfile::tempdir().unwrap();
         let file_path = dir.path().join("persist_test.md");
@@ -1598,5 +1581,116 @@ mod tests {
         app.handle_view_manager_key(key_event(KeyCode::Char('s'), KeyModifiers::NONE));
 
         assert_eq!(app.config.defaults.view, "View2");
+    }
+
+    #[test]
+    fn test_slash_opens_filter() {
+        let tasks = sample_tasks();
+        let views = sample_views();
+        let mut app = test_app(tasks, views);
+
+        app.handle_key(key_event(KeyCode::Char('/'), KeyModifiers::NONE));
+        assert!(app.filter_textarea.is_some());
+    }
+
+    #[test]
+    fn test_filter_typing_updates_live() {
+        let tasks = sample_tasks();
+        let views = sample_views();
+        let mut app = test_app(tasks, views);
+
+        app.handle_key(key_event(KeyCode::Char('/'), KeyModifiers::NONE));
+        for c in "bug".chars() {
+            app.handle_key(key_event(KeyCode::Char(c), KeyModifiers::NONE));
+        }
+        assert_eq!(app.filter_text, "bug");
+        assert!(app.filter_textarea.is_some()); // still open
+    }
+
+    #[test]
+    fn test_filter_enter_keeps() {
+        let tasks = sample_tasks();
+        let views = sample_views();
+        let mut app = test_app(tasks, views);
+
+        app.handle_key(key_event(KeyCode::Char('/'), KeyModifiers::NONE));
+        for c in "bug".chars() {
+            app.handle_key(key_event(KeyCode::Char(c), KeyModifiers::NONE));
+        }
+        app.handle_key(key_event(KeyCode::Enter, KeyModifiers::NONE));
+
+        assert!(app.filter_textarea.is_none());
+        assert_eq!(app.filter_text, "bug");
+
+        app.update_filtered_tasks();
+        assert_eq!(app.filtered_indices.len(), 1);
+    }
+
+    #[test]
+    fn test_filter_esc_clears() {
+        let tasks = sample_tasks();
+        let views = sample_views();
+        let mut app = test_app(tasks, views);
+
+        app.handle_key(key_event(KeyCode::Char('/'), KeyModifiers::NONE));
+        for c in "bug".chars() {
+            app.handle_key(key_event(KeyCode::Char(c), KeyModifiers::NONE));
+        }
+        app.handle_key(key_event(KeyCode::Esc, KeyModifiers::NONE));
+
+        assert!(app.filter_textarea.is_none());
+        assert_eq!(app.filter_text, "");
+    }
+
+    #[test]
+    fn test_esc_in_main_list_clears_active_filter() {
+        let tasks = sample_tasks();
+        let views = sample_views();
+        let mut app = test_app(tasks, views);
+        app.filter_text = "bug".to_string();
+
+        app.handle_key(key_event(KeyCode::Esc, KeyModifiers::NONE));
+        assert_eq!(app.filter_text, "");
+    }
+
+    #[test]
+    fn test_esc_in_main_list_no_filter_noop() {
+        let tasks = sample_tasks();
+        let views = sample_views();
+        let mut app = test_app(tasks, views);
+
+        // Must not panic or change state
+        app.handle_key(key_event(KeyCode::Esc, KeyModifiers::NONE));
+        assert_eq!(app.filter_text, "");
+        assert!(!app.should_quit);
+    }
+
+    #[test]
+    fn test_filter_reopens_prefilled() {
+        let tasks = sample_tasks();
+        let views = sample_views();
+        let mut app = test_app(tasks, views);
+        app.filter_text = "bug".to_string();
+
+        app.handle_key(key_event(KeyCode::Char('/'), KeyModifiers::NONE));
+        assert_eq!(app.filter_textarea.as_ref().unwrap().lines()[0], "bug");
+    }
+
+    #[test]
+    fn test_view_switch_clears_filter() {
+        let tasks = sample_tasks();
+        let views = vec![
+            View::new("View1", "not done", "", ""),
+            View::new("View2", "done", "", ""),
+        ];
+        let mut app = test_app(tasks, views);
+        app.show_view_manager = true;
+        app.filter_text = "bug".to_string();
+
+        app.handle_view_manager_key(key_event(KeyCode::Down, KeyModifiers::NONE));
+        app.handle_view_manager_key(key_event(KeyCode::Enter, KeyModifiers::NONE));
+
+        assert_eq!(app.current_view.name, "View2");
+        assert_eq!(app.filter_text, "");
     }
 }
