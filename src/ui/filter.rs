@@ -1,6 +1,9 @@
 use crate::task::Task;
 use crate::ui::App;
 use crossterm::event::{KeyCode, KeyEvent};
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::style::{Color, Style};
+use ratatui::widgets::{Clear, Paragraph};
 
 /// Returns true if the task matches the given filter text: case-insensitive
 /// substring match on the description and on tags. A leading '#' in the
@@ -40,6 +43,24 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
             }
         }
     }
+}
+
+pub fn draw(frame: &mut ratatui::Frame, app: &App) {
+    let Some(textarea) = &app.filter_textarea else {
+        return;
+    };
+    let area = frame.area();
+    let bar = Rect::new(0, area.height.saturating_sub(1), area.width, 1);
+    frame.render_widget(Clear, bar);
+
+    let chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Length(2), Constraint::Min(1)])
+        .split(bar);
+
+    let label = Paragraph::new("/ ").style(Style::default().fg(Color::Yellow));
+    frame.render_widget(label, chunks[0]);
+    frame.render_widget(textarea, chunks[1]);
 }
 
 #[cfg(test)]

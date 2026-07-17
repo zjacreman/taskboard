@@ -475,6 +475,9 @@ impl App {
         if self.search_textarea.is_some() {
             command::draw(frame, self);
         }
+        if self.filter_textarea.is_some() {
+            filter::draw(frame, self);
+        }
         if self.show_view_manager || self.view_edit.is_some() {
             draw_view_manager(frame, self);
         }

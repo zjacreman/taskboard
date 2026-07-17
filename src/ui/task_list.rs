@@ -216,12 +216,18 @@ fn draw_status_bar(frame: &mut ratatui::Frame, app: &App, area: Rect) {
         .count();
     let open = total - done;
 
+    let filter_ind = if app.filter_text.trim().is_empty() {
+        String::new()
+    } else {
+        format!(" | filter: \"{}\"", app.filter_text)
+    };
+
     let status = if let Some(msg) = &app.status_message {
-        format!("{} | q:quit / /:search / ?:help", msg)
+        format!("{} | q:quit / /:filter / ?:help", msg)
     } else {
         format!(
-            "{} tasks ({} done, {} open) | {} | q:quit / /:search / ?:help",
-            total, done, open, app.current_view.name
+            "{} tasks ({} done, {} open) | {}{} | q:quit / /:filter / ?:help",
+            total, done, open, app.current_view.name, filter_ind
         )
     };
 
