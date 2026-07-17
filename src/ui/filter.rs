@@ -3,8 +3,6 @@ use crate::task::Task;
 /// Returns true if the task matches the given filter text: case-insensitive
 /// substring match on the description and on tags. A leading '#' in the
 /// filter is ignored for tag matching. Empty/whitespace filter matches all.
-// TODO: remove allow(dead_code) once the filter is wired into the pipeline.
-#[allow(dead_code)]
 pub fn matches_filter(task: &Task, filter: &str) -> bool {
     let needle = filter.trim().to_lowercase();
     if needle.is_empty() {

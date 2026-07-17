@@ -40,6 +40,10 @@ pub struct App {
     pub file_watcher: Option<crate::vault::FileWatcher>,
     pub dirty: bool,
     pub status_message: Option<String>,
+    pub filter_text: String,
+    // TODO: remove allow(dead_code) once the filter input UI is wired up (Task 3).
+    #[allow(dead_code)]
+    pub filter_textarea: Option<TextArea<'static>>,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -93,6 +97,8 @@ impl App {
             file_watcher: None,
             dirty: true,
             status_message: None,
+            filter_text: String::new(),
+            filter_textarea: None,
         }
     }
 
@@ -445,6 +451,9 @@ impl App {
                 })
             })
             .collect();
+
+        self.filtered_indices
+            .retain(|&idx| filter::matches_filter(&self.tasks[idx], &self.filter_text));
 
         // Clamp selected_index
         if !self.filtered_indices.is_empty() && self.selected_index >= self.filtered_indices.len() {
@@ -876,6 +885,40 @@ mod tests {
         let tasks = sample_tasks();
         let views = sample_views();
         let mut app = test_app(tasks, views);
+        app.update_filtered_tasks();
+
+        assert_eq!(app.filtered_indices.len(), 3);
+    }
+
+    #[test]
+    fn test_filter_narrows_tasks() {
+        let tasks = sample_tasks();
+        let views = sample_views();
+        let mut app = test_app(tasks, views);
+        app.filter_text = "bug".to_string();
+        app.update_filtered_tasks();
+
+        assert_eq!(app.filtered_indices.len(), 1);
+        assert_eq!(app.tasks[app.filtered_indices[0]].description, "Fix bug");
+    }
+
+    #[test]
+    fn test_filter_by_tag() {
+        let tasks = sample_tasks();
+        let views = sample_views();
+        let mut app = test_app(tasks, views);
+        app.filter_text = "#work".to_string();
+        app.update_filtered_tasks();
+
+        assert_eq!(app.filtered_indices.len(), 2);
+    }
+
+    #[test]
+    fn test_filter_empty_shows_all() {
+        let tasks = sample_tasks();
+        let views = sample_views();
+        let mut app = test_app(tasks, views);
+        app.filter_text = "   ".to_string();
         app.update_filtered_tasks();
 
         assert_eq!(app.filtered_indices.len(), 3);
