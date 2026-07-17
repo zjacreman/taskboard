@@ -12,7 +12,9 @@ pub fn matches_filter(task: &Task, filter: &str) -> bool {
         return true;
     }
     let tag_needle = needle.trim_start_matches('#');
-    task.tags.iter().any(|t| t.to_lowercase().contains(tag_needle))
+    task.tags
+        .iter()
+        .any(|t| t.to_lowercase().contains(tag_needle))
 }
 
 #[cfg(test)]

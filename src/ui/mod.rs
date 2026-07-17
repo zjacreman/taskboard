@@ -1,7 +1,7 @@
-pub mod task_list;
-pub mod modal;
 pub mod command;
 pub mod filter;
+pub mod modal;
+pub mod task_list;
 
 use crate::config::Config;
 use crate::task::Task;
@@ -13,8 +13,8 @@ use std::io;
 use std::time::Duration;
 use tui_textarea::TextArea;
 
-use ratatui::widgets::ListState;
 use crate::ui::modal::EditField as TaskEditField;
+use ratatui::widgets::ListState;
 
 pub struct App {
     pub tasks: Vec<Task>,
@@ -52,8 +52,14 @@ pub enum ViewEditField {
 }
 
 impl App {
-    pub fn new(config: Config, tasks: Vec<Task>, views: Vec<View>, config_path: std::path::PathBuf) -> Self {
-        let current_view = views.iter()
+    pub fn new(
+        config: Config,
+        tasks: Vec<Task>,
+        views: Vec<View>,
+        config_path: std::path::PathBuf,
+    ) -> Self {
+        let current_view = views
+            .iter()
             .find(|v| v.name == config.defaults.view)
             .or(views.first())
             .cloned()
@@ -154,7 +160,9 @@ impl App {
             KeyCode::Char('j') | KeyCode::Down => self.move_down(),
             KeyCode::Char('k') | KeyCode::Up => self.move_up(),
             KeyCode::Char('g') => self.selected_index = 0,
-            KeyCode::Char('G') => self.selected_index = self.filtered_indices.len().saturating_sub(1),
+            KeyCode::Char('G') => {
+                self.selected_index = self.filtered_indices.len().saturating_sub(1)
+            }
             KeyCode::Char('x') => self.toggle_done(),
             KeyCode::Char('p') => self.cycle_priority(),
             KeyCode::Char('d') => self.set_due_date_today(),
@@ -239,7 +247,8 @@ impl App {
 
     fn set_due_date_tomorrow(&mut self) {
         if let Some(idx) = self.selected_task_index() {
-            self.tasks[idx].due_date = Some(chrono::Local::now().date_naive() + chrono::Duration::days(1));
+            self.tasks[idx].due_date =
+                Some(chrono::Local::now().date_naive() + chrono::Duration::days(1));
             self.persist_task(idx);
             self.dirty = true;
         }
@@ -255,7 +264,8 @@ impl App {
 
     fn set_scheduled_tomorrow(&mut self) {
         if let Some(idx) = self.selected_task_index() {
-            self.tasks[idx].scheduled_date = Some(chrono::Local::now().date_naive() + chrono::Duration::days(1));
+            self.tasks[idx].scheduled_date =
+                Some(chrono::Local::now().date_naive() + chrono::Duration::days(1));
             self.persist_task(idx);
             self.dirty = true;
         }
@@ -263,7 +273,9 @@ impl App {
 
     fn bump_scheduled(&mut self) {
         if let Some(idx) = self.selected_task_index() {
-            let date = self.tasks[idx].scheduled_date.unwrap_or_else(|| chrono::Local::now().date_naive());
+            let date = self.tasks[idx]
+                .scheduled_date
+                .unwrap_or_else(|| chrono::Local::now().date_naive());
             self.tasks[idx].scheduled_date = Some(date + chrono::Duration::days(1));
             self.persist_task(idx);
             self.dirty = true;
@@ -271,7 +283,13 @@ impl App {
     }
 
     fn start_search(&mut self) {
-        let mut textarea = TextArea::new(self.current_view.query.lines().map(|l| l.to_string()).collect());
+        let mut textarea = TextArea::new(
+            self.current_view
+                .query
+                .lines()
+                .map(|l| l.to_string())
+                .collect(),
+        );
         textarea.set_cursor_line_style(ratatui::style::Style::default());
         self.search_textarea = Some(textarea);
     }
@@ -303,7 +321,9 @@ impl App {
                     self.view_edit = None;
                 }
                 KeyCode::Enter => {
-                    if let (Some(idx), Some(textarea)) = (self.view_manager_state.selected(), &self.view_edit) {
+                    if let (Some(idx), Some(textarea)) =
+                        (self.view_manager_state.selected(), &self.view_edit)
+                    {
                         if let Some(view) = self.views.get_mut(idx) {
                             let text = textarea.lines()[0].clone();
                             match self.editing_view_field {
@@ -330,16 +350,12 @@ impl App {
             KeyCode::Esc => {
                 self.show_view_manager = false;
             }
-            KeyCode::Char('j') | KeyCode::Down
-                if !self.views.is_empty() =>
-            {
+            KeyCode::Char('j') | KeyCode::Down if !self.views.is_empty() => {
                 let i = self.view_manager_state.selected().unwrap_or(0);
                 let next = if i >= self.views.len() - 1 { 0 } else { i + 1 };
                 self.view_manager_state.select(Some(next));
             }
-            KeyCode::Char('k') | KeyCode::Up
-                if !self.views.is_empty() =>
-            {
+            KeyCode::Char('k') | KeyCode::Up if !self.views.is_empty() => {
                 let i = self.view_manager_state.selected().unwrap_or(0);
                 let prev = if i == 0 { self.views.len() - 1 } else { i - 1 };
                 self.view_manager_state.select(Some(prev));
@@ -354,13 +370,15 @@ impl App {
                     }
                 }
             }
-            KeyCode::Char('d')
-                if self.views.len() > 1 =>
-            {
+            KeyCode::Char('d') if self.views.len() > 1 => {
                 if let Some(idx) = self.view_manager_state.selected() {
                     if idx < self.views.len() {
                         self.views.remove(idx);
-                        let new_sel = if idx >= self.views.len() { self.views.len() - 1 } else { idx };
+                        let new_sel = if idx >= self.views.len() {
+                            self.views.len() - 1
+                        } else {
+                            idx
+                        };
                         self.view_manager_state.select(Some(new_sel));
                         self.save_config();
                     }
@@ -388,14 +406,16 @@ impl App {
     }
 
     fn save_config(&mut self) {
-        self.config.views = self.views.iter().map(|v| {
-            crate::config::ViewConfig {
+        self.config.views = self
+            .views
+            .iter()
+            .map(|v| crate::config::ViewConfig {
                 name: v.name.clone(),
                 query: v.query.clone(),
                 sort_by: v.sort_by.clone(),
                 group_by: v.group_by.clone(),
-            }
-        }).collect();
+            })
+            .collect();
         if let Err(e) = self.config.save(&self.config_path) {
             log::warn!("Failed to save config: {}", e);
         }
@@ -408,16 +428,17 @@ impl App {
             self.current_view.query.clone()
         };
 
-        let mut result = crate::task::query::execute_query(&query, &self.tasks)
-            .unwrap_or_default();
+        let mut result = crate::task::query::execute_query(&query, &self.tasks).unwrap_or_default();
 
         // Default sort: by source file path, then by line number
         result.sort_by(|a, b| {
-            a.source_file.cmp(&b.source_file)
+            a.source_file
+                .cmp(&b.source_file)
                 .then(a.line_number.cmp(&b.line_number))
         });
 
-        self.filtered_indices = result.iter()
+        self.filtered_indices = result
+            .iter()
             .filter_map(|t| {
                 self.tasks.iter().position(|task| {
                     task.source_file == t.source_file && task.line_number == t.line_number
@@ -480,7 +501,10 @@ fn draw_view_manager(frame: &mut ratatui::Frame, app: &App) {
             .style(Style::default().bg(Color::DarkGray));
         frame.render_widget(block, popup_area);
 
-        let inner = popup_area.inner(ratatui::layout::Margin { horizontal: 1, vertical: 1 });
+        let inner = popup_area.inner(ratatui::layout::Margin {
+            horizontal: 1,
+            vertical: 1,
+        });
         let chunks = ratatui::layout::Layout::default()
             .direction(ratatui::layout::Direction::Vertical)
             .constraints([
@@ -491,17 +515,18 @@ fn draw_view_manager(frame: &mut ratatui::Frame, app: &App) {
             ])
             .split(inner);
 
-        let view_name = app.views.get(app.view_manager_state.selected().unwrap_or(0))
+        let view_name = app
+            .views
+            .get(app.view_manager_state.selected().unwrap_or(0))
             .map(|v| v.name.as_str())
             .unwrap_or("");
         let title = Paragraph::new(format!("Editing view: {}", view_name));
         frame.render_widget(title, chunks[0]);
 
-        let label = Paragraph::new(vec![
-            Line::from(vec![
-                Span::styled(format!("{}: ", field_name), Style::default().fg(Color::Gray)),
-            ])
-        ]);
+        let label = Paragraph::new(vec![Line::from(vec![Span::styled(
+            format!("{}: ", field_name),
+            Style::default().fg(Color::Gray),
+        )])]);
         frame.render_widget(label, chunks[1]);
 
         frame.render_widget(textarea, chunks[2]);
@@ -518,14 +543,25 @@ fn draw_view_manager(frame: &mut ratatui::Frame, app: &App) {
             .enumerate()
             .map(|(i, v)| {
                 let style = if Some(i) == app.view_manager_state.selected() {
-                    Style::default().fg(Color::Black).bg(Color::White).add_modifier(Modifier::BOLD)
+                    Style::default()
+                        .fg(Color::Black)
+                        .bg(Color::White)
+                        .add_modifier(Modifier::BOLD)
                 } else if v.name == app.current_view.name {
                     Style::default().fg(Color::Cyan)
                 } else {
                     Style::default().fg(Color::White)
                 };
-                let prefix = if v.name == app.current_view.name { "* " } else { "  " };
-                let suffix = if v.name == app.config.defaults.view { " (default)" } else { "" };
+                let prefix = if v.name == app.current_view.name {
+                    "* "
+                } else {
+                    "  "
+                };
+                let suffix = if v.name == app.config.defaults.view {
+                    " (default)"
+                } else {
+                    ""
+                };
                 ListItem::new(Line::from(format!("{}{}{}", prefix, v.name, suffix))).style(style)
             })
             .collect();
@@ -604,11 +640,11 @@ fn draw_help_overlay(frame: &mut ratatui::Frame) {
 
 #[cfg(test)]
 mod tests {
-    use crate::config::{Config, WorkspaceConfig, DefaultsConfig, ThemeConfig};
-    use crate::task::{Task, TaskStatus, Priority};
-    use crate::view::View;
+    use crate::config::{Config, DefaultsConfig, ThemeConfig, WorkspaceConfig};
+    use crate::task::{Priority, Task, TaskStatus};
     use crate::test_helpers::sample_tasks;
     use crate::ui::modal::EditField;
+    use crate::view::View;
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
     use std::path::PathBuf;
 
@@ -620,7 +656,9 @@ mod tests {
 
     fn sample_config() -> Config {
         Config {
-            workspace: WorkspaceConfig { path: PathBuf::from(".") },
+            workspace: WorkspaceConfig {
+                path: PathBuf::from("."),
+            },
             defaults: DefaultsConfig::default(),
             theme: ThemeConfig::default(),
             views: vec![],
@@ -741,7 +779,10 @@ mod tests {
         app.selected_index = 2;
         let idx = app.selected_task_index().unwrap();
         app.set_due_date_today();
-        assert_eq!(app.tasks[idx].due_date, Some(chrono::Local::now().date_naive()));
+        assert_eq!(
+            app.tasks[idx].due_date,
+            Some(chrono::Local::now().date_naive())
+        );
     }
 
     #[test]
@@ -766,7 +807,10 @@ mod tests {
 
         let idx = app.selected_task_index().unwrap();
         app.set_scheduled_today();
-        assert_eq!(app.tasks[idx].scheduled_date, Some(chrono::Local::now().date_naive()));
+        assert_eq!(
+            app.tasks[idx].scheduled_date,
+            Some(chrono::Local::now().date_naive())
+        );
     }
 
     #[test]
@@ -793,7 +837,10 @@ mod tests {
         let idx = app.selected_task_index().unwrap();
         let original = app.tasks[idx].scheduled_date.unwrap();
         app.bump_scheduled();
-        assert_eq!(app.tasks[idx].scheduled_date, Some(original + chrono::Duration::days(1)));
+        assert_eq!(
+            app.tasks[idx].scheduled_date,
+            Some(original + chrono::Duration::days(1))
+        );
     }
 
     #[test]
@@ -809,7 +856,10 @@ mod tests {
         assert!(app.tasks[idx].scheduled_date.is_none());
         app.bump_scheduled();
         let today = chrono::Local::now().date_naive();
-        assert_eq!(app.tasks[idx].scheduled_date, Some(today + chrono::Duration::days(1)));
+        assert_eq!(
+            app.tasks[idx].scheduled_date,
+            Some(today + chrono::Duration::days(1))
+        );
     }
 
     #[test]
@@ -1236,7 +1286,11 @@ mod tests {
 
         // Verify text has 'x' inserted two chars from end
         let text = &app.task_edit.as_ref().unwrap().lines()[0];
-        let expected = format!("{}x{}", &original_desc[..original_desc.len()-2], &original_desc[original_desc.len()-2..]);
+        let expected = format!(
+            "{}x{}",
+            &original_desc[..original_desc.len() - 2],
+            &original_desc[original_desc.len() - 2..]
+        );
         assert_eq!(text, &expected);
 
         // Save
@@ -1292,7 +1346,11 @@ mod tests {
     fn test_toggle_done_persists_to_file() {
         let dir = tempfile::tempdir().unwrap();
         let file_path = dir.path().join("persist_test.md");
-        std::fs::write(&file_path, "# Tasks\n- [ ] Buy groceries\n- [x] Review PR\n").unwrap();
+        std::fs::write(
+            &file_path,
+            "# Tasks\n- [ ] Buy groceries\n- [x] Review PR\n",
+        )
+        .unwrap();
 
         let tasks = vec![
             Task {
@@ -1333,8 +1391,16 @@ mod tests {
 
         // Verify file was updated
         let content = std::fs::read_to_string(&file_path).unwrap();
-        assert!(content.contains("- [x] Buy groceries"), "File should contain done task, got: {}", content);
-        assert!(content.contains("✅"), "File should contain done date emoji, got: {}", content);
+        assert!(
+            content.contains("- [x] Buy groceries"),
+            "File should contain done task, got: {}",
+            content
+        );
+        assert!(
+            content.contains("✅"),
+            "File should contain done date emoji, got: {}",
+            content
+        );
     }
 
     #[test]
@@ -1343,21 +1409,19 @@ mod tests {
         let file_path = dir.path().join("rescan_test.md");
         std::fs::write(&file_path, "# Tasks\n- [ ] Buy groceries\n").unwrap();
 
-        let tasks = vec![
-            Task {
-                description: "Buy groceries".to_string(),
-                status: TaskStatus::Todo,
-                priority: Priority::None,
-                due_date: None,
-                scheduled_date: None,
-                recurrence: None,
-                done_date: None,
-                start_date: None,
-                tags: vec![],
-                source_file: file_path.clone(),
-                line_number: 2,
-            },
-        ];
+        let tasks = vec![Task {
+            description: "Buy groceries".to_string(),
+            status: TaskStatus::Todo,
+            priority: Priority::None,
+            due_date: None,
+            scheduled_date: None,
+            recurrence: None,
+            done_date: None,
+            start_date: None,
+            tags: vec![],
+            source_file: file_path.clone(),
+            line_number: 2,
+        }];
 
         let views = sample_views();
         let mut app = test_app(tasks, views);
@@ -1371,7 +1435,11 @@ mod tests {
         let content = std::fs::read_to_string(&file_path).unwrap();
         let reparsed = crate::task::parser::parse_file(&content, &file_path);
         assert_eq!(reparsed.len(), 1);
-        assert_eq!(reparsed[0].status, TaskStatus::Done, "Rescanned task should be done");
+        assert_eq!(
+            reparsed[0].status,
+            TaskStatus::Done,
+            "Rescanned task should be done"
+        );
     }
 
     #[test]
@@ -1423,11 +1491,20 @@ mod tests {
         app.update_filtered_tasks();
 
         // Should be sorted by path then line number
-        assert_eq!(app.tasks[app.filtered_indices[0]].source_file, PathBuf::from("a.md"));
+        assert_eq!(
+            app.tasks[app.filtered_indices[0]].source_file,
+            PathBuf::from("a.md")
+        );
         assert_eq!(app.tasks[app.filtered_indices[0]].line_number, 1);
-        assert_eq!(app.tasks[app.filtered_indices[1]].source_file, PathBuf::from("a.md"));
+        assert_eq!(
+            app.tasks[app.filtered_indices[1]].source_file,
+            PathBuf::from("a.md")
+        );
         assert_eq!(app.tasks[app.filtered_indices[1]].line_number, 2);
-        assert_eq!(app.tasks[app.filtered_indices[2]].source_file, PathBuf::from("b.md"));
+        assert_eq!(
+            app.tasks[app.filtered_indices[2]].source_file,
+            PathBuf::from("b.md")
+        );
     }
 
     #[test]

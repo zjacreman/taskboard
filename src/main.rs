@@ -1,8 +1,8 @@
 mod config;
 mod task;
+mod ui;
 mod vault;
 mod view;
-mod ui;
 
 #[cfg(test)]
 mod test_helpers;
@@ -13,7 +13,8 @@ use std::path::PathBuf;
 fn prompt_workspace_path() -> PathBuf {
     let mut rl = rustyline::DefaultEditor::new().expect("Failed to create editor");
 
-    let input = rl.readline("Enter Obsidian vault path: ")
+    let input = rl
+        .readline("Enter Obsidian vault path: ")
         .expect("Failed to read input");
 
     let trimmed = input.trim();
@@ -100,9 +101,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .join("taskboard")
         .join("config.toml");
 
-    let views: Vec<crate::view::View> = config.views.iter().map(|v| {
-        crate::view::View::new(&v.name, &v.query, &v.sort_by, &v.group_by)
-    }).collect();
+    let views: Vec<crate::view::View> = config
+        .views
+        .iter()
+        .map(|v| crate::view::View::new(&v.name, &v.query, &v.sort_by, &v.group_by))
+        .collect();
 
     let file_watcher = vault::FileWatcher::new(&workspace_path).ok();
 

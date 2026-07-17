@@ -17,7 +17,9 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
         return;
     }
 
-    let Some(textarea) = &mut app.search_textarea else { return };
+    let Some(textarea) = &mut app.search_textarea else {
+        return;
+    };
 
     match key.code {
         KeyCode::Esc => {
@@ -39,7 +41,9 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
 }
 
 fn handle_save_view_key(app: &mut App, key: KeyEvent) {
-    let Some(textarea) = &mut app.save_view_edit else { return };
+    let Some(textarea) = &mut app.save_view_edit else {
+        return;
+    };
     match key.code {
         KeyCode::Esc => {
             app.save_view_edit = None;
@@ -102,7 +106,9 @@ fn handle_overwrite_confirm_key(app: &mut App, key: KeyEvent) {
 }
 
 fn submit_query(app: &mut App) {
-    let Some(textarea) = &app.search_textarea else { return };
+    let Some(textarea) = &app.search_textarea else {
+        return;
+    };
     app.current_view.query = textarea.lines().join("\n");
     app.search_textarea = None;
     app.dirty = true;
@@ -114,7 +120,9 @@ pub fn draw(frame: &mut ratatui::Frame, app: &App) {
         return;
     }
 
-    let Some(textarea) = &app.search_textarea else { return };
+    let Some(textarea) = &app.search_textarea else {
+        return;
+    };
 
     let area = frame.area();
     let popup_width = 70.min(area.width - 4);
@@ -132,7 +140,10 @@ pub fn draw(frame: &mut ratatui::Frame, app: &App) {
         .style(Style::default().bg(Color::DarkGray));
     frame.render_widget(block, popup_area);
 
-    let inner = popup_area.inner(ratatui::layout::Margin { horizontal: 1, vertical: 1 });
+    let inner = popup_area.inner(ratatui::layout::Margin {
+        horizontal: 1,
+        vertical: 1,
+    });
     let chunks = ratatui::layout::Layout::default()
         .direction(ratatui::layout::Direction::Vertical)
         .constraints([
@@ -143,8 +154,14 @@ pub fn draw(frame: &mut ratatui::Frame, app: &App) {
         .split(inner);
 
     let instructions = Paragraph::new(vec![
-        Line::from(Span::styled("One filter per line. Example:", Style::default().fg(Color::Gray))),
-        Line::from(Span::styled("  not done\ndue before tomorrow\nsort by priority", Style::default().fg(Color::Gray))),
+        Line::from(Span::styled(
+            "One filter per line. Example:",
+            Style::default().fg(Color::Gray),
+        )),
+        Line::from(Span::styled(
+            "  not done\ndue before tomorrow\nsort by priority",
+            Style::default().fg(Color::Gray),
+        )),
     ]);
     frame.render_widget(instructions, chunks[0]);
 
@@ -153,19 +170,39 @@ pub fn draw(frame: &mut ratatui::Frame, app: &App) {
     let help = Paragraph::new(vec![
         Line::from(""),
         Line::from(vec![
-            Span::styled("Enter", Style::default().fg(Color::White).add_modifier(ratatui::style::Modifier::BOLD)),
+            Span::styled(
+                "Enter",
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(ratatui::style::Modifier::BOLD),
+            ),
             Span::raw(": newline"),
         ]),
         Line::from(vec![
-            Span::styled("Alt+Enter", Style::default().fg(Color::White).add_modifier(ratatui::style::Modifier::BOLD)),
+            Span::styled(
+                "Alt+Enter",
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(ratatui::style::Modifier::BOLD),
+            ),
             Span::raw(": apply query"),
         ]),
         Line::from(vec![
-            Span::styled("Ctrl+S", Style::default().fg(Color::White).add_modifier(ratatui::style::Modifier::BOLD)),
+            Span::styled(
+                "Ctrl+S",
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(ratatui::style::Modifier::BOLD),
+            ),
             Span::raw(": save as view"),
         ]),
         Line::from(vec![
-            Span::styled("Esc", Style::default().fg(Color::White).add_modifier(ratatui::style::Modifier::BOLD)),
+            Span::styled(
+                "Esc",
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(ratatui::style::Modifier::BOLD),
+            ),
             Span::raw(": cancel"),
         ]),
     ]);
@@ -177,7 +214,9 @@ fn draw_save_view(frame: &mut ratatui::Frame, app: &App) {
         draw_overwrite_confirm(frame, app, idx);
         return;
     }
-    let Some(textarea) = &app.save_view_edit else { return };
+    let Some(textarea) = &app.save_view_edit else {
+        return;
+    };
 
     let area = frame.area();
     let popup_width = 50.min(area.width - 4);
@@ -194,7 +233,10 @@ fn draw_save_view(frame: &mut ratatui::Frame, app: &App) {
         .style(Style::default().bg(Color::DarkGray));
     frame.render_widget(block, popup_area);
 
-    let inner = popup_area.inner(ratatui::layout::Margin { horizontal: 1, vertical: 1 });
+    let inner = popup_area.inner(ratatui::layout::Margin {
+        horizontal: 1,
+        vertical: 1,
+    });
     let chunks = ratatui::layout::Layout::default()
         .direction(ratatui::layout::Direction::Vertical)
         .constraints([
@@ -215,7 +257,10 @@ fn draw_save_view(frame: &mut ratatui::Frame, app: &App) {
     frame.render_widget(textarea, chunks[1]);
 
     let query_preview = Paragraph::new(Span::styled(
-        format!("Query: {}", app.current_view.query.lines().next().unwrap_or("")),
+        format!(
+            "Query: {}",
+            app.current_view.query.lines().next().unwrap_or("")
+        ),
         Style::default().fg(Color::Gray),
     ));
     frame.render_widget(query_preview, chunks[3]);
@@ -243,7 +288,10 @@ fn draw_overwrite_confirm(frame: &mut ratatui::Frame, app: &App, idx: usize) {
         .style(Style::default().bg(Color::DarkGray));
     frame.render_widget(block, popup_area);
 
-    let inner = popup_area.inner(ratatui::layout::Margin { horizontal: 1, vertical: 1 });
+    let inner = popup_area.inner(ratatui::layout::Margin {
+        horizontal: 1,
+        vertical: 1,
+    });
     let chunks = ratatui::layout::Layout::default()
         .direction(ratatui::layout::Direction::Vertical)
         .constraints([

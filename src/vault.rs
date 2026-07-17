@@ -1,11 +1,14 @@
+use notify::{Event, EventKind, RecursiveMode, Watcher};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use notify::{Watcher, RecursiveMode, Event, EventKind};
 use std::sync::mpsc;
 use std::time::Duration;
 
 fn is_markdown_file(path: &Path) -> bool {
-    matches!(path.extension().and_then(|e| e.to_str()), Some("md") | Some("markdown"))
+    matches!(
+        path.extension().and_then(|e| e.to_str()),
+        Some("md") | Some("markdown")
+    )
 }
 
 pub struct FileWatcher {
@@ -124,7 +127,9 @@ mod tests {
         let files = find_markdown_files(dir.path());
 
         assert!(!files.iter().any(|f| f.to_string_lossy().contains(".git")));
-        assert!(!files.iter().any(|f| f.to_string_lossy().contains("node_modules")));
+        assert!(!files
+            .iter()
+            .any(|f| f.to_string_lossy().contains("node_modules")));
     }
 
     #[test]

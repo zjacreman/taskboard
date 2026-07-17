@@ -1,11 +1,11 @@
+use crate::task::{Priority, TaskStatus};
 use crate::ui::App;
-use crate::task::{TaskStatus, Priority};
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph};
-use tui_textarea::{TextArea, CursorMove};
+use tui_textarea::{CursorMove, TextArea};
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum EditField {
@@ -70,7 +70,8 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
         }
         KeyCode::Char('D') => {
             if let Some(idx) = app.selected_task_index() {
-                app.tasks[idx].due_date = Some(chrono::Local::now().date_naive() + chrono::Duration::days(1));
+                app.tasks[idx].due_date =
+                    Some(chrono::Local::now().date_naive() + chrono::Duration::days(1));
                 app.persist_task(idx);
                 app.dirty = true;
             }
@@ -84,14 +85,17 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
         }
         KeyCode::Char('S') => {
             if let Some(idx) = app.selected_task_index() {
-                app.tasks[idx].scheduled_date = Some(chrono::Local::now().date_naive() + chrono::Duration::days(1));
+                app.tasks[idx].scheduled_date =
+                    Some(chrono::Local::now().date_naive() + chrono::Duration::days(1));
                 app.persist_task(idx);
                 app.dirty = true;
             }
         }
         KeyCode::Char('b') => {
             if let Some(idx) = app.selected_task_index() {
-                let date = app.tasks[idx].scheduled_date.unwrap_or_else(|| chrono::Local::now().date_naive());
+                let date = app.tasks[idx]
+                    .scheduled_date
+                    .unwrap_or_else(|| chrono::Local::now().date_naive());
                 app.tasks[idx].scheduled_date = Some(date + chrono::Duration::days(1));
                 app.persist_task(idx);
                 app.dirty = true;
@@ -131,7 +135,9 @@ fn prev_field(f: EditField) -> EditField {
 }
 
 fn start_field_edit(app: &mut App) {
-    let Some(idx) = app.selected_task_index() else { return };
+    let Some(idx) = app.selected_task_index() else {
+        return;
+    };
     match app.task_edit_field {
         EditField::Priority => {
             app.tasks[idx].priority.cycle();
@@ -148,10 +154,12 @@ fn start_field_edit(app: &mut App) {
             TaskStatus::Done => "done".to_string(),
         },
         EditField::Priority => unreachable!(),
-        EditField::DueDate => app.tasks[idx].due_date
+        EditField::DueDate => app.tasks[idx]
+            .due_date
             .map(|d| d.format("%Y-%m-%d").to_string())
             .unwrap_or_default(),
-        EditField::ScheduledDate => app.tasks[idx].scheduled_date
+        EditField::ScheduledDate => app.tasks[idx]
+            .scheduled_date
             .map(|d| d.format("%Y-%m-%d").to_string())
             .unwrap_or_default(),
         EditField::Recurrence => app.tasks[idx].recurrence.clone().unwrap_or_default(),
@@ -180,9 +188,13 @@ fn handle_field_edit(app: &mut App, key: KeyEvent) {
 }
 
 fn apply_field_edit(app: &mut App) {
-    let Some(textarea) = &app.task_edit else { return };
+    let Some(textarea) = &app.task_edit else {
+        return;
+    };
     let text = textarea.lines()[0].clone();
-    let Some(idx) = app.selected_task_index() else { return };
+    let Some(idx) = app.selected_task_index() else {
+        return;
+    };
     match app.task_edit_field {
         EditField::Description => {
             app.tasks[idx].description = text;
@@ -253,14 +265,18 @@ pub fn draw(frame: &mut ratatui::Frame, app: &App) {
 
     frame.render_widget(Clear, popup_area);
 
-    let Some(idx) = app.selected_task_index() else { return };
+    let Some(idx) = app.selected_task_index() else {
+        return;
+    };
     let task = &app.tasks[idx];
 
     let selected = app.task_edit_field;
 
     let mut lines: Vec<Line> = Vec::new();
 
-    let rel = app.workspace_path.as_ref()
+    let rel = app
+        .workspace_path
+        .as_ref()
         .and_then(|wp| task.source_file.strip_prefix(wp).ok())
         .unwrap_or(&task.source_file);
     lines.push(Line::from(Span::styled(
@@ -269,12 +285,54 @@ pub fn draw(frame: &mut ratatui::Frame, app: &App) {
     )));
     lines.push(Line::from(""));
 
-    lines.push(field_line("Description", &task.description, selected == EditField::Description, editing, edit_text, cursor_col));
-    lines.push(field_line("Status", status_display(task.status), selected == EditField::Status, editing, edit_text, cursor_col));
-    lines.push(field_line("Priority", priority_display(task.priority), selected == EditField::Priority, editing, edit_text, cursor_col));
-    lines.push(field_line("Due Date", &date_display(task.due_date), selected == EditField::DueDate, editing, edit_text, cursor_col));
-    lines.push(field_line("Scheduled", &date_display(task.scheduled_date), selected == EditField::ScheduledDate, editing, edit_text, cursor_col));
-    lines.push(field_line("Recurrence", task.recurrence.as_deref().unwrap_or("none"), selected == EditField::Recurrence, editing, edit_text, cursor_col));
+    lines.push(field_line(
+        "Description",
+        &task.description,
+        selected == EditField::Description,
+        editing,
+        edit_text,
+        cursor_col,
+    ));
+    lines.push(field_line(
+        "Status",
+        status_display(task.status),
+        selected == EditField::Status,
+        editing,
+        edit_text,
+        cursor_col,
+    ));
+    lines.push(field_line(
+        "Priority",
+        priority_display(task.priority),
+        selected == EditField::Priority,
+        editing,
+        edit_text,
+        cursor_col,
+    ));
+    lines.push(field_line(
+        "Due Date",
+        &date_display(task.due_date),
+        selected == EditField::DueDate,
+        editing,
+        edit_text,
+        cursor_col,
+    ));
+    lines.push(field_line(
+        "Scheduled",
+        &date_display(task.scheduled_date),
+        selected == EditField::ScheduledDate,
+        editing,
+        edit_text,
+        cursor_col,
+    ));
+    lines.push(field_line(
+        "Recurrence",
+        task.recurrence.as_deref().unwrap_or("none"),
+        selected == EditField::Recurrence,
+        editing,
+        edit_text,
+        cursor_col,
+    ));
 
     lines.push(Line::from(""));
     if editing {
@@ -317,7 +375,14 @@ pub fn draw(frame: &mut ratatui::Frame, app: &App) {
     frame.render_widget(paragraph, popup_area);
 }
 
-fn field_line<'a>(label: &str, value: &str, selected: bool, editing: bool, edit_text: &str, cursor_col: usize) -> Line<'a> {
+fn field_line<'a>(
+    label: &str,
+    value: &str,
+    selected: bool,
+    editing: bool,
+    edit_text: &str,
+    cursor_col: usize,
+) -> Line<'a> {
     let label_style = Style::default().fg(Color::Gray);
     let marker = if selected { "▸ " } else { "  " };
 
@@ -337,7 +402,12 @@ fn field_line<'a>(label: &str, value: &str, selected: bool, editing: bool, edit_
             Span::styled(marker, Style::default().fg(Color::Cyan)),
             Span::styled(format!("{:12}", label), label_style),
             Span::styled("│ ", Style::default().fg(Color::Cyan)),
-            Span::styled(value.to_string(), Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                value.to_string(),
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("  (e to edit)", Style::default().fg(Color::Gray)),
         ])
     } else {
@@ -369,5 +439,6 @@ fn priority_display(p: Priority) -> &'static str {
 }
 
 fn date_display(d: Option<chrono::NaiveDate>) -> String {
-    d.map(|d| d.format("%Y-%m-%d").to_string()).unwrap_or_else(|| "none".to_string())
+    d.map(|d| d.format("%Y-%m-%d").to_string())
+        .unwrap_or_else(|| "none".to_string())
 }

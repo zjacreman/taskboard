@@ -1,4 +1,4 @@
-use super::{Task, TaskStatus, Priority};
+use super::{Priority, Task, TaskStatus};
 use chrono::NaiveDate;
 use std::path::Path;
 
@@ -21,7 +21,10 @@ fn parse_line(line: &str, line_number: usize, source_file: &Path) -> Option<Task
     // Must start with "- [ ]" or "- [x]"
     let (status, rest) = if let Some(stripped) = trimmed.strip_prefix("- [ ]") {
         (TaskStatus::Todo, stripped)
-    } else if let Some(stripped) = trimmed.strip_prefix("- [x]").or_else(|| trimmed.strip_prefix("- [X]")) {
+    } else if let Some(stripped) = trimmed
+        .strip_prefix("- [x]")
+        .or_else(|| trimmed.strip_prefix("- [X]"))
+    {
         (TaskStatus::Done, stripped)
     } else {
         return None;
@@ -172,7 +175,10 @@ fn parse_tag(chars: &mut std::iter::Peekable<std::str::Chars>) -> String {
 
 fn is_emoji(ch: char) -> bool {
     // Check for common task emojis
-    matches!(ch, '📅' | '🛫' | '🔁' | '✅' | '⏳' | '🔺' | '⏫' | '🔼' | '🔽' | '⏬')
+    matches!(
+        ch,
+        '📅' | '🛫' | '🔁' | '✅' | '⏳' | '🔺' | '⏫' | '🔼' | '🔽' | '⏬'
+    )
 }
 
 #[cfg(test)]
@@ -199,10 +205,16 @@ mod tests {
 
         let due_task = &tasks[0];
         assert_eq!(due_task.description, "Task with due date");
-        assert_eq!(due_task.due_date, Some(NaiveDate::from_ymd_opt(2026, 6, 15).unwrap()));
+        assert_eq!(
+            due_task.due_date,
+            Some(NaiveDate::from_ymd_opt(2026, 6, 15).unwrap())
+        );
 
         let scheduled_task = &tasks[1];
-        assert_eq!(scheduled_task.scheduled_date, Some(NaiveDate::from_ymd_opt(2026, 6, 12).unwrap()));
+        assert_eq!(
+            scheduled_task.scheduled_date,
+            Some(NaiveDate::from_ymd_opt(2026, 6, 12).unwrap())
+        );
 
         let recurrence_task = &tasks[2];
         assert_eq!(recurrence_task.recurrence, Some("every week".to_string()));
@@ -211,13 +223,22 @@ mod tests {
         assert_eq!(priority_task.priority, Priority::High);
 
         let all_fields = &tasks[4];
-        assert_eq!(all_fields.due_date, Some(NaiveDate::from_ymd_opt(2026, 6, 15).unwrap()));
-        assert_eq!(all_fields.scheduled_date, Some(NaiveDate::from_ymd_opt(2026, 6, 12).unwrap()));
+        assert_eq!(
+            all_fields.due_date,
+            Some(NaiveDate::from_ymd_opt(2026, 6, 15).unwrap())
+        );
+        assert_eq!(
+            all_fields.scheduled_date,
+            Some(NaiveDate::from_ymd_opt(2026, 6, 12).unwrap())
+        );
         assert_eq!(all_fields.recurrence, Some("every week".to_string()));
         assert_eq!(all_fields.priority, Priority::High);
 
         let done_task = &tasks[5];
-        assert_eq!(done_task.done_date, Some(NaiveDate::from_ymd_opt(2026, 6, 10).unwrap()));
+        assert_eq!(
+            done_task.done_date,
+            Some(NaiveDate::from_ymd_opt(2026, 6, 10).unwrap())
+        );
 
         let tagged_task = &tasks[6];
         assert_eq!(tagged_task.tags, vec!["work", "urgent"]);
@@ -229,7 +250,9 @@ mod tests {
         let tasks = parse_file(&content, &PathBuf::from("tests/fixtures/edge_cases.md"));
 
         // Should parse tasks with extra spaces
-        assert!(tasks.iter().any(|t| t.description == "Task with extra spaces"));
+        assert!(tasks
+            .iter()
+            .any(|t| t.description == "Task with extra spaces"));
 
         // Should handle special characters
         assert!(tasks.iter().any(|t| t.description.contains("<>&\"'")));
@@ -239,7 +262,9 @@ mod tests {
         assert!(tasks.iter().any(|t| t.description == "Done sub-task"));
 
         // Should not include non-task lines
-        assert!(!tasks.iter().any(|t| t.description == "Not a task (no checkbox)"));
+        assert!(!tasks
+            .iter()
+            .any(|t| t.description == "Not a task (no checkbox)"));
     }
 
     #[test]

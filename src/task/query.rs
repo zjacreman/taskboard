@@ -1,4 +1,4 @@
-use super::{Task, TaskStatus, Priority};
+use super::{Priority, Task, TaskStatus};
 use chrono::NaiveDate;
 
 #[derive(Debug)]
@@ -120,7 +120,11 @@ fn parse_query(query_str: &str) -> Result<Query, String> {
                     filters.push(Filter::NotFolder(tokens[i + 2].clone()));
                     i += 3;
                 }
-                "does" if i + 3 < tokens.len() && tokens[i + 1] == "not" && tokens[i + 2] == "include" => {
+                "does"
+                    if i + 3 < tokens.len()
+                        && tokens[i + 1] == "not"
+                        && tokens[i + 2] == "include" =>
+                {
                     filters.push(Filter::NotIncludes(tokens[i + 3].clone()));
                     i += 4;
                 }
@@ -128,11 +132,20 @@ fn parse_query(query_str: &str) -> Result<Query, String> {
                     filters.push(Filter::PathIncludes(tokens[i + 2].clone()));
                     i += 3;
                 }
-                "path" if i + 4 < tokens.len() && tokens[i + 1] == "does" && tokens[i + 2] == "not" && tokens[i + 3] == "include" => {
+                "path"
+                    if i + 4 < tokens.len()
+                        && tokens[i + 1] == "does"
+                        && tokens[i + 2] == "not"
+                        && tokens[i + 3] == "include" =>
+                {
                     filters.push(Filter::PathNotIncludes(tokens[i + 4].clone()));
                     i += 5;
                 }
-                "path" if i + 3 < tokens.len() && tokens[i + 1] == "does" && tokens[i + 2] == "include" => {
+                "path"
+                    if i + 3 < tokens.len()
+                        && tokens[i + 1] == "does"
+                        && tokens[i + 2] == "include" =>
+                {
                     filters.push(Filter::PathIncludes(tokens[i + 3].clone()));
                     i += 4;
                 }
@@ -181,7 +194,9 @@ fn parse_query(query_str: &str) -> Result<Query, String> {
                             "before" => filters.push(Filter::ScheduledBefore(date)),
                             "after" => filters.push(Filter::ScheduledAfter(date)),
                             "on" => filters.push(Filter::ScheduledOn(date)),
-                            _ => return Err(format!("Unknown scheduled filter: {}", tokens[i + 1])),
+                            _ => {
+                                return Err(format!("Unknown scheduled filter: {}", tokens[i + 1]))
+                            }
                         }
                         i += 3;
                     } else {
@@ -217,11 +232,19 @@ fn parse_query(query_str: &str) -> Result<Query, String> {
                     filters.push(Filter::HasRecurrence);
                     i += 2;
                 }
-                "has" if i + 2 < tokens.len() && tokens[i + 1] == "due" && tokens[i + 2] == "date" => {
+                "has"
+                    if i + 2 < tokens.len()
+                        && tokens[i + 1] == "due"
+                        && tokens[i + 2] == "date" =>
+                {
                     filters.push(Filter::HasDueDate);
                     i += 3;
                 }
-                "has" if i + 2 < tokens.len() && tokens[i + 1] == "scheduled" && tokens[i + 2] == "date" => {
+                "has"
+                    if i + 2 < tokens.len()
+                        && tokens[i + 1] == "scheduled"
+                        && tokens[i + 2] == "date" =>
+                {
                     filters.push(Filter::HasScheduledDate);
                     i += 3;
                 }
@@ -229,11 +252,17 @@ fn parse_query(query_str: &str) -> Result<Query, String> {
                     filters.push(Filter::NoRecurrence);
                     i += 2;
                 }
-                "no" if i + 2 < tokens.len() && tokens[i + 1] == "due" && tokens[i + 2] == "date" => {
+                "no" if i + 2 < tokens.len()
+                    && tokens[i + 1] == "due"
+                    && tokens[i + 2] == "date" =>
+                {
                     filters.push(Filter::NoDueDate);
                     i += 3;
                 }
-                "no" if i + 2 < tokens.len() && tokens[i + 1] == "scheduled" && tokens[i + 2] == "date" => {
+                "no" if i + 2 < tokens.len()
+                    && tokens[i + 1] == "scheduled"
+                    && tokens[i + 2] == "date" =>
+                {
                     filters.push(Filter::NoScheduledDate);
                     i += 3;
                 }
@@ -242,7 +271,9 @@ fn parse_query(query_str: &str) -> Result<Query, String> {
                     i += 3;
                 }
                 "limit" if i + 1 < tokens.len() => {
-                    let n = tokens[i + 1].parse::<usize>().map_err(|_| "Invalid limit")?;
+                    let n = tokens[i + 1]
+                        .parse::<usize>()
+                        .map_err(|_| "Invalid limit")?;
                     filters.push(Filter::Limit(n));
                     i += 2;
                 }
@@ -318,10 +349,7 @@ fn parse_date(s: &str) -> Result<NaiveDate, String> {
         "today" => Ok(today),
         "tomorrow" => Ok(today + chrono::Duration::days(1)),
         "yesterday" => Ok(today - chrono::Duration::days(1)),
-        _ => {
-            NaiveDate::parse_from_str(s, "%Y-%m-%d")
-                .map_err(|_| format!("Invalid date: {}", s))
-        }
+        _ => NaiveDate::parse_from_str(s, "%Y-%m-%d").map_err(|_| format!("Invalid date: {}", s)),
     }
 }
 
@@ -359,33 +387,44 @@ fn matches_filter(task: &Task, filter: &Filter) -> bool {
             let lower = text.to_lowercase();
             task.description.to_lowercase().contains(&lower)
                 || task.tags.iter().any(|t| t.to_lowercase().contains(&lower))
-                || task.recurrence.as_ref().is_some_and(|r| r.to_lowercase().contains(&lower))
+                || task
+                    .recurrence
+                    .as_ref()
+                    .is_some_and(|r| r.to_lowercase().contains(&lower))
         }
         Filter::NotIncludes(text) => {
             let lower = text.to_lowercase();
             !task.description.to_lowercase().contains(&lower)
                 && !task.tags.iter().any(|t| t.to_lowercase().contains(&lower))
-                && !task.recurrence.as_ref().is_some_and(|r| r.to_lowercase().contains(&lower))
+                && !task
+                    .recurrence
+                    .as_ref()
+                    .is_some_and(|r| r.to_lowercase().contains(&lower))
         }
-        Filter::DescriptionIncludes(text) => task.description.to_lowercase().contains(&text.to_lowercase()),
+        Filter::DescriptionIncludes(text) => task
+            .description
+            .to_lowercase()
+            .contains(&text.to_lowercase()),
         Filter::Tag(tag) => task.tags.contains(&tag.to_string()),
         Filter::NotTag(tag) => !task.tags.contains(&tag.to_string()),
-        Filter::Folder(folder) => {
-            task.source_file.components().any(|c| {
-                c.as_os_str().to_string_lossy() == folder.as_str()
-            })
-        }
-        Filter::NotFolder(folder) => {
-            !task.source_file.components().any(|c| {
-                c.as_os_str().to_string_lossy() == folder.as_str()
-            })
-        }
-        Filter::PathIncludes(text) => {
-            task.source_file.to_string_lossy().to_lowercase().contains(&text.to_lowercase())
-        }
-        Filter::PathNotIncludes(text) => {
-            !task.source_file.to_string_lossy().to_lowercase().contains(&text.to_lowercase())
-        }
+        Filter::Folder(folder) => task
+            .source_file
+            .components()
+            .any(|c| c.as_os_str().to_string_lossy() == folder.as_str()),
+        Filter::NotFolder(folder) => !task
+            .source_file
+            .components()
+            .any(|c| c.as_os_str().to_string_lossy() == folder.as_str()),
+        Filter::PathIncludes(text) => task
+            .source_file
+            .to_string_lossy()
+            .to_lowercase()
+            .contains(&text.to_lowercase()),
+        Filter::PathNotIncludes(text) => !task
+            .source_file
+            .to_string_lossy()
+            .to_lowercase()
+            .contains(&text.to_lowercase()),
         Filter::DueBefore(date) => task.due_date.is_some_and(|d| d < *date),
         Filter::DueAfter(date) => task.due_date.is_some_and(|d| d > *date),
         Filter::DueOn(date) => task.due_date == Some(*date),
@@ -393,12 +432,12 @@ fn matches_filter(task: &Task, filter: &Filter) -> bool {
         Filter::ScheduledAfter(date) => task.scheduled_date.is_some_and(|d| d > *date),
         Filter::ScheduledOn(date) => task.scheduled_date == Some(*date),
         Filter::HappensBefore(date) => {
-            task.due_date.is_some_and(|d| d < *date) ||
-            task.scheduled_date.is_some_and(|d| d < *date)
+            task.due_date.is_some_and(|d| d < *date)
+                || task.scheduled_date.is_some_and(|d| d < *date)
         }
         Filter::HappensAfter(date) => {
-            task.due_date.is_some_and(|d| d > *date) ||
-            task.scheduled_date.is_some_and(|d| d > *date)
+            task.due_date.is_some_and(|d| d > *date)
+                || task.scheduled_date.is_some_and(|d| d > *date)
         }
         Filter::HappensOn(date) => {
             task.due_date == Some(*date) || task.scheduled_date == Some(*date)
@@ -408,9 +447,10 @@ fn matches_filter(task: &Task, filter: &Filter) -> bool {
         Filter::PriorityIs(p) => task.priority == *p,
         Filter::HasRecurrence => task.recurrence.is_some(),
         Filter::NoRecurrence => task.recurrence.is_none(),
-        Filter::RecurrenceIncludes(text) => {
-            task.recurrence.as_ref().is_some_and(|r| r.to_lowercase().contains(&text.to_lowercase()))
-        }
+        Filter::RecurrenceIncludes(text) => task
+            .recurrence
+            .as_ref()
+            .is_some_and(|r| r.to_lowercase().contains(&text.to_lowercase())),
         Filter::HasDueDate => task.due_date.is_some(),
         Filter::NoDueDate => task.due_date.is_none(),
         Filter::HasScheduledDate => task.scheduled_date.is_some(),
@@ -625,7 +665,9 @@ mod tests {
         tasks[0].source_file = std::path::PathBuf::from("boards/Reading List.md");
         let result = execute_query("path does not include \"Reading List\"", &tasks).unwrap();
         assert_eq!(result.len(), 2);
-        assert!(!result.iter().any(|t| t.source_file.to_string_lossy().contains("Reading List")));
+        assert!(!result
+            .iter()
+            .any(|t| t.source_file.to_string_lossy().contains("Reading List")));
     }
 
     #[test]

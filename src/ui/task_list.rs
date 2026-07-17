@@ -11,10 +11,7 @@ const PATH_INDENT: &str = "    ";
 pub fn draw(frame: &mut ratatui::Frame, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Min(1),
-            Constraint::Length(1),
-        ])
+        .constraints([Constraint::Min(1), Constraint::Length(1)])
         .split(frame.area());
 
     draw_task_list(frame, app, chunks[0]);
@@ -101,16 +98,20 @@ fn draw_task_list(frame: &mut ratatui::Frame, app: &App, area: Rect) {
                 format!("{} ", priority)
             };
 
-            let due = task.due_date
+            let due = task
+                .due_date
                 .map(|d| format_due_date(d, width))
                 .unwrap_or_default();
 
-            let scheduled = task.scheduled_date
+            let scheduled = task
+                .scheduled_date
                 .map(|d| format_scheduled_date(d, width))
                 .unwrap_or_default();
 
             let (source, show_path_below) = if width >= WIDE_WIDTH {
-                let rel = app.workspace_path.as_ref()
+                let rel = app
+                    .workspace_path
+                    .as_ref()
                     .and_then(|wp| task.source_file.strip_prefix(wp).ok())
                     .unwrap_or(&task.source_file);
                 (format!(" {}", rel.display()), false)
@@ -119,7 +120,9 @@ fn draw_task_list(frame: &mut ratatui::Frame, app: &App, area: Rect) {
             };
 
             let path_display = if show_path_below {
-                let rel = app.workspace_path.as_ref()
+                let rel = app
+                    .workspace_path
+                    .as_ref()
                     .and_then(|wp| task.source_file.strip_prefix(wp).ok())
                     .unwrap_or(&task.source_file);
                 rel.display().to_string()
@@ -129,7 +132,9 @@ fn draw_task_list(frame: &mut ratatui::Frame, app: &App, area: Rect) {
 
             let prefix_len = status.len() + 1 + priority_str.len();
             let metadata_len = due.len() + scheduled.len() + source.len();
-            let desc_max_width = inner_width.saturating_sub(prefix_len + metadata_len).max(20);
+            let desc_max_width = inner_width
+                .saturating_sub(prefix_len + metadata_len)
+                .max(20);
 
             let desc_lines = wrap_text(&task.description, desc_max_width);
 
@@ -137,28 +142,28 @@ fn draw_task_list(frame: &mut ratatui::Frame, app: &App, area: Rect) {
 
             if i == app.selected_index {
                 let first_desc = desc_lines.first().cloned().unwrap_or_default();
-                let main_line = format!("{} {}{}{}{}{}", status, priority_str, first_desc, due, scheduled, source);
-                lines.push(Line::from(vec![
-                    Span::styled(
-                        main_line,
-                        Style::default().fg(Color::Black).bg(Color::White).add_modifier(Modifier::BOLD),
-                    ),
-                ]));
+                let main_line = format!(
+                    "{} {}{}{}{}{}",
+                    status, priority_str, first_desc, due, scheduled, source
+                );
+                lines.push(Line::from(vec![Span::styled(
+                    main_line,
+                    Style::default()
+                        .fg(Color::Black)
+                        .bg(Color::White)
+                        .add_modifier(Modifier::BOLD),
+                )]));
                 for desc_line in desc_lines.iter().skip(1) {
-                    lines.push(Line::from(vec![
-                        Span::styled(
-                            format!("{}{}", " ".repeat(prefix_len), desc_line),
-                            Style::default().fg(Color::Black).bg(Color::White),
-                        ),
-                    ]));
+                    lines.push(Line::from(vec![Span::styled(
+                        format!("{}{}", " ".repeat(prefix_len), desc_line),
+                        Style::default().fg(Color::Black).bg(Color::White),
+                    )]));
                 }
                 if show_path_below && !path_display.is_empty() {
-                    lines.push(Line::from(vec![
-                        Span::styled(
-                            format!("{}{}", PATH_INDENT, path_display),
-                            Style::default().fg(Color::Black).bg(Color::White),
-                        ),
-                    ]));
+                    lines.push(Line::from(vec![Span::styled(
+                        format!("{}{}", PATH_INDENT, path_display),
+                        Style::default().fg(Color::Black).bg(Color::White),
+                    )]));
                 }
             } else {
                 let first_desc = desc_lines.first().cloned().unwrap_or_default();
@@ -167,7 +172,10 @@ fn draw_task_list(frame: &mut ratatui::Frame, app: &App, area: Rect) {
                     Span::raw(" "),
                     Span::raw(priority_str),
                     Span::raw(first_desc),
-                    Span::styled(format!("{}{}{}", due, scheduled, source), Style::default().fg(Color::Yellow)),
+                    Span::styled(
+                        format!("{}{}{}", due, scheduled, source),
+                        Style::default().fg(Color::Yellow),
+                    ),
                 ]));
                 for desc_line in desc_lines.iter().skip(1) {
                     lines.push(Line::from(vec![
@@ -176,12 +184,10 @@ fn draw_task_list(frame: &mut ratatui::Frame, app: &App, area: Rect) {
                     ]));
                 }
                 if show_path_below && !path_display.is_empty() {
-                    lines.push(Line::from(vec![
-                        Span::styled(
-                            format!("{}{}", PATH_INDENT, path_display),
-                            Style::default().fg(Color::Yellow),
-                        ),
-                    ]));
+                    lines.push(Line::from(vec![Span::styled(
+                        format!("{}{}", PATH_INDENT, path_display),
+                        Style::default().fg(Color::Yellow),
+                    )]));
                 }
             }
 
@@ -189,12 +195,11 @@ fn draw_task_list(frame: &mut ratatui::Frame, app: &App, area: Rect) {
         })
         .collect();
 
-    let list = List::new(items)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(format!("TaskBoard - {}", app.current_view.name)),
-        );
+    let list = List::new(items).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(format!("TaskBoard - {}", app.current_view.name)),
+    );
 
     let mut state = ListState::default();
     state.select(Some(app.selected_index));

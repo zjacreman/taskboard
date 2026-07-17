@@ -132,7 +132,10 @@ impl Task {
         let idx = self.line_number - 1;
         let old_line = &lines[idx];
 
-        let indent = old_line.chars().take_while(|c| c.is_whitespace()).collect::<String>();
+        let indent = old_line
+            .chars()
+            .take_while(|c| c.is_whitespace())
+            .collect::<String>();
         lines[idx] = format!("{}{}", indent, self.to_markdown());
 
         std::fs::write(&self.source_file, lines.join("\n"))?;
@@ -277,7 +280,10 @@ mod tests {
         task.write_to_file().unwrap();
 
         let content = std::fs::read_to_string(&file_path).unwrap();
-        assert_eq!(content, "# Header\n- [x] Updated task ✅ 2026-06-11\n- [x] Done task");
+        assert_eq!(
+            content,
+            "# Header\n- [x] Updated task ✅ 2026-06-11\n- [x] Done task"
+        );
     }
 
     #[test]

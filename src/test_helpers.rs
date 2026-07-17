@@ -1,5 +1,5 @@
 #[cfg(test)]
-use crate::task::{Task, TaskStatus, Priority};
+use crate::task::{Priority, Task, TaskStatus};
 #[cfg(test)]
 use chrono::NaiveDate;
 #[cfg(test)]

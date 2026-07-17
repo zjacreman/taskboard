@@ -207,8 +207,12 @@ path = "/tmp/vault"
         let path = dir.path().join("config.toml");
 
         let config = Config {
-            workspace: WorkspaceConfig { path: PathBuf::from("/tmp/vault") },
-            defaults: DefaultsConfig { view: "My View".to_string() },
+            workspace: WorkspaceConfig {
+                path: PathBuf::from("/tmp/vault"),
+            },
+            defaults: DefaultsConfig {
+                view: "My View".to_string(),
+            },
             theme: ThemeConfig::default(),
             views: vec![
                 ViewConfig {
