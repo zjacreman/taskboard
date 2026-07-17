@@ -1,6 +1,7 @@
 pub mod task_list;
 pub mod modal;
 pub mod command;
+pub mod filter;
 
 use crate::config::Config;
 use crate::task::Task;
