@@ -30,24 +30,14 @@ pub struct App {
     pub show_modal: bool,
     pub show_view_manager: bool,
     pub view_manager_state: ListState,
-    pub view_edit: Option<TextArea<'static>>,
+    pub view_form: Option<view_manager::ViewForm>,
     pub task_edit: Option<TextArea<'static>>,
-    pub editing_view_field: ViewEditField,
     pub task_edit_field: TaskEditField,
     pub file_watcher: Option<crate::vault::FileWatcher>,
     pub dirty: bool,
     pub status_message: Option<String>,
     pub filter_text: String,
     pub filter_textarea: Option<TextArea<'static>>,
-}
-
-#[derive(Clone, Copy, PartialEq)]
-#[allow(dead_code)]
-pub enum ViewEditField {
-    Name,
-    Query,
-    SortBy,
-    GroupBy,
 }
 
 impl App {
@@ -82,9 +72,8 @@ impl App {
             show_modal: false,
             show_view_manager: false,
             view_manager_state,
-            view_edit: None,
+            view_form: None,
             task_edit: None,
-            editing_view_field: ViewEditField::Name,
             task_edit_field: TaskEditField::Description,
             file_watcher: None,
             dirty: true,
@@ -371,7 +360,7 @@ impl App {
         if self.filter_textarea.is_some() {
             filter::draw(frame, self);
         }
-        if self.show_view_manager || self.view_edit.is_some() {
+        if self.show_view_manager || self.view_form.is_some() {
             view_manager::draw(frame, self);
         }
     }
@@ -1472,5 +1461,75 @@ mod tests {
 
         assert_eq!(app.current_view.name, "View2");
         assert_eq!(app.filter_text, "");
+    }
+
+    #[test]
+    fn test_view_form_add_opens_empty() {
+        let tasks = sample_tasks();
+        let views = sample_views();
+        let mut app = test_app(tasks, views);
+        app.show_view_manager = true;
+
+        app.handle_view_manager_key(key_event(KeyCode::Char('a'), KeyModifiers::NONE));
+
+        let form = app.view_form.as_ref().expect("form should be open");
+        assert_eq!(form.editing_index, None);
+        assert_eq!(form.focus, 0);
+        assert_eq!(form.fields[0].lines()[0], "");
+        assert_eq!(form.fields[1].lines()[0], "");
+    }
+
+    #[test]
+    fn test_view_form_edit_opens_populated() {
+        let tasks = sample_tasks();
+        let views = vec![
+            View::new("View1", "not done", "due_date", "tag"),
+            View::new("View2", "done", "", ""),
+        ];
+        let mut app = test_app(tasks, views);
+        app.show_view_manager = true;
+
+        app.handle_view_manager_key(key_event(KeyCode::Char('e'), KeyModifiers::NONE));
+
+        let form = app.view_form.as_ref().expect("form should be open");
+        assert_eq!(form.editing_index, Some(0));
+        assert_eq!(form.fields[0].lines()[0], "View1");
+        assert_eq!(form.fields[1].lines()[0], "not done");
+        assert_eq!(form.fields[2].lines()[0], "due_date");
+        assert_eq!(form.fields[3].lines()[0], "tag");
+    }
+
+    #[test]
+    fn test_view_form_focus_navigation() {
+        let tasks = sample_tasks();
+        let views = sample_views();
+        let mut app = test_app(tasks, views);
+        app.show_view_manager = true;
+        app.handle_view_manager_key(key_event(KeyCode::Char('a'), KeyModifiers::NONE));
+
+        for expected in [1, 2, 3, 0] {
+            app.handle_view_manager_key(key_event(KeyCode::Tab, KeyModifiers::NONE));
+            assert_eq!(app.view_form.as_ref().unwrap().focus, expected);
+        }
+
+        app.handle_view_manager_key(key_event(KeyCode::BackTab, KeyModifiers::SHIFT));
+        assert_eq!(app.view_form.as_ref().unwrap().focus, 3);
+    }
+
+    #[test]
+    fn test_view_form_cancel_discards() {
+        let tasks = sample_tasks();
+        let views = vec![View::new("View1", "not done", "", "")];
+        let mut app = test_app(tasks, views);
+        app.show_view_manager = true;
+
+        app.handle_view_manager_key(key_event(KeyCode::Char('e'), KeyModifiers::NONE));
+        for c in "junk".chars() {
+            app.handle_view_manager_key(key_event(KeyCode::Char(c), KeyModifiers::NONE));
+        }
+        app.handle_view_manager_key(key_event(KeyCode::Esc, KeyModifiers::NONE));
+
+        assert!(app.view_form.is_none());
+        assert_eq!(app.views[0].name, "View1"); // unchanged
     }
 }
