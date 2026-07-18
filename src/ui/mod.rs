@@ -1,4 +1,3 @@
-pub mod command;
 pub mod filter;
 pub mod modal;
 pub mod task_list;
@@ -30,9 +29,6 @@ pub struct App {
     pub show_modal: bool,
     pub show_view_manager: bool,
     pub view_manager_state: ListState,
-    pub search_textarea: Option<TextArea<'static>>,
-    pub save_view_edit: Option<TextArea<'static>>,
-    pub save_view_confirm_overwrite: Option<usize>,
     pub view_edit: Option<TextArea<'static>>,
     pub task_edit: Option<TextArea<'static>>,
     pub editing_view_field: ViewEditField,
@@ -85,9 +81,6 @@ impl App {
             show_modal: false,
             show_view_manager: false,
             view_manager_state,
-            search_textarea: None,
-            save_view_edit: None,
-            save_view_confirm_overwrite: None,
             view_edit: None,
             task_edit: None,
             editing_view_field: ViewEditField::Name,
@@ -151,10 +144,6 @@ impl App {
         }
         if self.filter_textarea.is_some() {
             filter::handle_key(self, key);
-            return;
-        }
-        if self.search_textarea.is_some() {
-            command::handle_key(self, key);
             return;
         }
         if self.show_view_manager {
@@ -430,13 +419,8 @@ impl App {
     }
 
     pub fn update_filtered_tasks(&mut self) {
-        let query = if let Some(textarea) = &self.search_textarea {
-            textarea.lines().join("\n")
-        } else {
-            self.current_view.query.clone()
-        };
-
-        let mut result = crate::task::query::execute_query(&query, &self.tasks).unwrap_or_default();
+        let mut result = crate::task::query::execute_query(&self.current_view.query, &self.tasks)
+            .unwrap_or_default();
 
         // Default sort: by source file path, then by line number
         result.sort_by(|a, b| {
@@ -471,9 +455,6 @@ impl App {
         }
         if self.show_modal {
             modal::draw(frame, self);
-        }
-        if self.search_textarea.is_some() {
-            command::draw(frame, self);
         }
         if self.filter_textarea.is_some() {
             filter::draw(frame, self);
@@ -628,9 +609,9 @@ fn draw_help_overlay(frame: &mut ratatui::Frame) {
         Line::from("  b         Bump scheduled +1 day"),
         Line::from(""),
         Line::from("Views:"),
-        Line::from("  /         Search/query"),
-        Line::from("  v         Switch view"),
-        Line::from("  V         Manage views (e:edit, d:del, s:default)"),
+        Line::from("  /         Filter tasks (text)"),
+        Line::from("  Esc       Clear active filter"),
+        Line::from("  v         Manage views (a:add e:edit d:del s:default)"),
         Line::from(""),
         Line::from("  Enter     Edit task (modal)"),
         Line::from("  r         Rescan vault"),
