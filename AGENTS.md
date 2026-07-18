@@ -43,10 +43,11 @@ src/
     parser.rs      # Markdown task checkbox parsing
     query.rs       # Query/filter engine (Obsidian Tasks syntax)
   ui/
-    mod.rs         # UI root, layout
-    task_list.rs   # Main task list widget
-    command.rs     # Command palette / search input
-    modal.rs       # Modal editor for task editing
+    mod.rs          # UI root, layout
+    task_list.rs    # Main task list widget
+    filter.rs       # In-view text filter (bottom bar, '/' key)
+    view_manager.rs # View list + add/edit form ('v' key)
+    modal.rs        # Modal editor for task editing
   test_helpers.rs  # Shared test utilities
 tests/
   integration_test.rs  # Integration tests
