@@ -1667,4 +1667,44 @@ mod tests {
 
         assert_eq!(app.views[1].query, "not done\ntag work");
     }
+
+    #[test]
+    fn test_view_form_rename_current_view_syncs_name() {
+        let tasks = sample_tasks();
+        let views = vec![View::new("All Tasks", "", "", "")];
+        let mut app = test_app(tasks, views);
+        assert_eq!(app.current_view.name, "All Tasks");
+        app.show_view_manager = true;
+
+        app.handle_view_manager_key(key_event(KeyCode::Char('e'), KeyModifiers::NONE));
+        // Name field is focused, cursor at end — append "X"
+        app.handle_view_manager_key(key_event(KeyCode::Char('X'), KeyModifiers::NONE));
+        app.handle_view_manager_key(key_event(KeyCode::Enter, KeyModifiers::NONE));
+
+        assert!(app.view_form.is_none());
+        assert_eq!(app.views[0].name, "All TasksX");
+        assert_eq!(app.current_view.name, "All TasksX");
+    }
+
+    #[test]
+    fn test_view_form_save_clears_status_message() {
+        let tasks = sample_tasks();
+        let views = sample_views();
+        let mut app = test_app(tasks, views);
+        app.show_view_manager = true;
+
+        // First save attempt fails (empty name) -> sets status_message
+        app.handle_view_manager_key(key_event(KeyCode::Char('a'), KeyModifiers::NONE));
+        app.handle_view_manager_key(key_event(KeyCode::Enter, KeyModifiers::NONE));
+        assert!(app.status_message.is_some());
+
+        // Fix the name and save successfully -> status_message cleared
+        for c in "Work".chars() {
+            app.handle_view_manager_key(key_event(KeyCode::Char(c), KeyModifiers::NONE));
+        }
+        app.handle_view_manager_key(key_event(KeyCode::Enter, KeyModifiers::NONE));
+
+        assert!(app.view_form.is_none());
+        assert!(app.status_message.is_none());
+    }
 }

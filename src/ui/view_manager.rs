@@ -210,6 +210,7 @@ fn save_form(app: &mut App) {
         }
     }
 
+    app.status_message = None;
     app.save_config();
     app.view_form = None;
 }
