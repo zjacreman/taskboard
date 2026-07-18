@@ -165,9 +165,53 @@ fn handle_form_key(app: &mut App, key: KeyEvent) {
 }
 
 fn save_form(app: &mut App) {
-    // Implemented in Task 8.
-    let _ = app;
-    todo!("save_form");
+    let Some(form) = &app.view_form else {
+        return;
+    };
+    let name = form.fields[FIELD_NAME].lines()[0].trim().to_string();
+    let editing_index = form.editing_index;
+    let query = form.fields[FIELD_QUERY].lines().join("\n");
+    let sort_by = form.fields[FIELD_SORT_BY].lines()[0].clone();
+    let group_by = form.fields[FIELD_GROUP_BY].lines()[0].clone();
+
+    if name.is_empty() {
+        app.status_message = Some("View name required".to_string());
+        return;
+    }
+
+    let duplicate = app
+        .views
+        .iter()
+        .enumerate()
+        .any(|(i, v)| v.name == name && Some(i) != editing_index);
+    if duplicate {
+        app.status_message = Some(format!("View '{}' already exists", name));
+        return;
+    }
+
+    match editing_index {
+        Some(idx) => {
+            let was_current = app.views[idx].name == app.current_view.name;
+            {
+                let view = &mut app.views[idx];
+                view.name = name;
+                view.query = query;
+                view.sort_by = sort_by;
+                view.group_by = group_by;
+            }
+            if was_current {
+                app.current_view = app.views[idx].clone();
+                app.dirty = true;
+            }
+        }
+        None => {
+            app.views
+                .push(crate::view::View::new(&name, &query, &sort_by, &group_by));
+        }
+    }
+
+    app.save_config();
+    app.view_form = None;
 }
 
 pub fn draw(frame: &mut ratatui::Frame, app: &App) {

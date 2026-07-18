@@ -1532,4 +1532,139 @@ mod tests {
         assert!(app.view_form.is_none());
         assert_eq!(app.views[0].name, "View1"); // unchanged
     }
+
+    #[test]
+    fn test_view_form_add_creates_view() {
+        let tasks = sample_tasks();
+        let views = sample_views();
+        let mut app = test_app(tasks, views);
+        app.show_view_manager = true;
+
+        app.handle_view_manager_key(key_event(KeyCode::Char('a'), KeyModifiers::NONE));
+        for c in "Work".chars() {
+            app.handle_view_manager_key(key_event(KeyCode::Char(c), KeyModifiers::NONE));
+        }
+        app.handle_view_manager_key(key_event(KeyCode::Tab, KeyModifiers::NONE)); // to query field
+        for c in "not done".chars() {
+            app.handle_view_manager_key(key_event(KeyCode::Char(c), KeyModifiers::NONE));
+        }
+        app.handle_view_manager_key(key_event(KeyCode::Enter, KeyModifiers::NONE));
+
+        assert!(app.view_form.is_none());
+        assert_eq!(app.views.len(), 2);
+        assert_eq!(app.views[1].name, "Work");
+        assert_eq!(app.views[1].query, "not done");
+    }
+
+    #[test]
+    fn test_view_form_edit_updates_view() {
+        let tasks = sample_tasks();
+        let views = vec![View::new("View1", "not done", "", "")];
+        let mut app = test_app(tasks, views);
+        app.show_view_manager = true;
+
+        app.handle_view_manager_key(key_event(KeyCode::Char('e'), KeyModifiers::NONE));
+        app.handle_view_manager_key(key_event(KeyCode::Tab, KeyModifiers::NONE)); // query field, cursor at end
+        for c in " tag work".chars() {
+            app.handle_view_manager_key(key_event(KeyCode::Char(c), KeyModifiers::NONE));
+        }
+        app.handle_view_manager_key(key_event(KeyCode::Enter, KeyModifiers::NONE));
+
+        assert!(app.view_form.is_none());
+        assert_eq!(app.views[0].query, "not done tag work");
+    }
+
+    #[test]
+    fn test_view_form_empty_name_rejected() {
+        let tasks = sample_tasks();
+        let views = sample_views();
+        let mut app = test_app(tasks, views);
+        app.show_view_manager = true;
+
+        app.handle_view_manager_key(key_event(KeyCode::Char('a'), KeyModifiers::NONE));
+        app.handle_view_manager_key(key_event(KeyCode::Enter, KeyModifiers::NONE));
+
+        assert!(app.view_form.is_some()); // still open
+        assert_eq!(app.status_message.as_deref(), Some("View name required"));
+        assert_eq!(app.views.len(), 1);
+    }
+
+    #[test]
+    fn test_view_form_duplicate_name_rejected() {
+        let tasks = sample_tasks();
+        let views = vec![View::new("View1", "", "", "")];
+        let mut app = test_app(tasks, views);
+        app.show_view_manager = true;
+
+        app.handle_view_manager_key(key_event(KeyCode::Char('a'), KeyModifiers::NONE));
+        for c in "View1".chars() {
+            app.handle_view_manager_key(key_event(KeyCode::Char(c), KeyModifiers::NONE));
+        }
+        app.handle_view_manager_key(key_event(KeyCode::Enter, KeyModifiers::NONE));
+
+        assert!(app.view_form.is_some());
+        assert_eq!(
+            app.status_message.as_deref(),
+            Some("View 'View1' already exists")
+        );
+        assert_eq!(app.views.len(), 1);
+    }
+
+    #[test]
+    fn test_view_form_rename_to_own_name_allowed() {
+        let tasks = sample_tasks();
+        let views = vec![View::new("View1", "not done", "", "")];
+        let mut app = test_app(tasks, views);
+        app.show_view_manager = true;
+
+        // Open edit form and save without changes — must not be treated as duplicate.
+        app.handle_view_manager_key(key_event(KeyCode::Char('e'), KeyModifiers::NONE));
+        app.handle_view_manager_key(key_event(KeyCode::Enter, KeyModifiers::NONE));
+
+        assert!(app.view_form.is_none());
+        assert!(app.status_message.is_none());
+        assert_eq!(app.views[0].name, "View1");
+    }
+
+    #[test]
+    fn test_view_form_edit_current_view_syncs() {
+        let tasks = sample_tasks();
+        let views = vec![View::new("All Tasks", "", "", "")];
+        let mut app = test_app(tasks, views);
+        assert_eq!(app.current_view.name, "All Tasks");
+        app.show_view_manager = true;
+
+        app.handle_view_manager_key(key_event(KeyCode::Char('e'), KeyModifiers::NONE));
+        app.handle_view_manager_key(key_event(KeyCode::Tab, KeyModifiers::NONE)); // query field
+        for c in "not done".chars() {
+            app.handle_view_manager_key(key_event(KeyCode::Char(c), KeyModifiers::NONE));
+        }
+        app.handle_view_manager_key(key_event(KeyCode::Enter, KeyModifiers::NONE));
+
+        assert_eq!(app.current_view.query, "not done");
+    }
+
+    #[test]
+    fn test_view_form_query_multiline() {
+        let tasks = sample_tasks();
+        let views = sample_views();
+        let mut app = test_app(tasks, views);
+        app.show_view_manager = true;
+
+        app.handle_view_manager_key(key_event(KeyCode::Char('a'), KeyModifiers::NONE));
+        for c in "V".chars() {
+            app.handle_view_manager_key(key_event(KeyCode::Char(c), KeyModifiers::NONE));
+        }
+        app.handle_view_manager_key(key_event(KeyCode::Tab, KeyModifiers::NONE)); // query field
+        for c in "not done".chars() {
+            app.handle_view_manager_key(key_event(KeyCode::Char(c), KeyModifiers::NONE));
+        }
+        app.handle_view_manager_key(key_event(KeyCode::Enter, KeyModifiers::ALT)); // newline
+        for c in "tag work".chars() {
+            app.handle_view_manager_key(key_event(KeyCode::Char(c), KeyModifiers::NONE));
+        }
+        app.handle_view_manager_key(key_event(KeyCode::Enter, KeyModifiers::NONE)); // save
+
+        assert_eq!(app.views[1].query, "not done\ntag work");
+    }
 }
